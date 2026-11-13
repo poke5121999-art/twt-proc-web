@@ -73,12 +73,12 @@ window.__t0 = performance.now();
     <div id="status">Đang tải…</div>
     <button id="go" disabled>Vào game</button>
     <div id="fatal"></div>
-    <div class="foot">Cần trình duyệt có WebGL2. Bản <span id="build">18ce91185db3</span>.</div>
+    <div class="foot">Cần trình duyệt có WebGL2. Bản <span id="build">c8f7da9f694f</span>.</div>
   </div>
 </div>
 <script type="module">
-const BUILD = '18ce91185db3';
-const EXPECTED = Number('35812420') || 0;
+const BUILD = 'c8f7da9f694f';
+const EXPECTED = Number('35844308') || 0;
 const $ = id => document.getElementById(id);
 const fatal = msg => { const f = $('fatal'); f.style.display = 'block'; f.textContent = msg; $('status').textContent = 'Không khởi động được.'; };
 
