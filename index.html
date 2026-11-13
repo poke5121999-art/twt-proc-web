@@ -67,17 +67,18 @@ window.__t0 = performance.now();
       <li><b>F</b> dùng đồ hồi máu</li>
       <li><b>B</b> dựng dây thép gai</li>
       <li><b>Tab</b> ba lô, trợ giúp</li>
+      <li><b>?q=</b> low / med / high trên URL</li>
     </ul>
     <div id="bar"><div id="fill"></div></div>
     <div id="status">Đang tải…</div>
     <button id="go" disabled>Vào game</button>
     <div id="fatal"></div>
-    <div class="foot">Cần trình duyệt có WebGL2. Bản <span id="build">136092459a0b</span>.</div>
+    <div class="foot">Cần trình duyệt có WebGL2. Bản <span id="build">5ca772c80989</span>.</div>
   </div>
 </div>
 <script type="module">
-const BUILD = '136092459a0b';
-const EXPECTED = Number('35736739') || 0;
+const BUILD = '5ca772c80989';
+const EXPECTED = Number('35810708') || 0;
 const $ = id => document.getElementById(id);
 const fatal = msg => { const f = $('fatal'); f.style.display = 'block'; f.textContent = msg; $('status').textContent = 'Không khởi động được.'; };
 
@@ -119,10 +120,23 @@ async function fetchWasm() {
   try {
     const gl = document.createElement('canvas').getContext('webgl2');
     if (!gl) throw new Error('Trình duyệt này không có WebGL2, game không chạy được.');
+    // Tự chọn mức đồ hoạ theo GPU: 0 thấp (phần mềm, Intel HD/UHD, GPU điện thoại), 1 vừa (tích hợp khá), 2 cao (card rời).
+    // ?q=low|med|high ghi đè. Game còn tự hạ một mức nếu dưới 28 khung/giây suốt 5 giây.
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const gpu = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) || '');
+    let tier = 2;
+    if (/swiftshader|llvmpipe|software|basic render|mali|adreno|powervr/i.test(gpu) || /intel/i.test(gpu) && !/iris|arc/i.test(gpu)) tier = 0;
+    else if (/iris|apple|radeon\(tm\) graphics|radeon graphics|vega/i.test(gpu) && !/rx|pro/i.test(gpu)) tier = 1;
+    if (tier > 0 && ((navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4)) tier -= 1;
+    window.__twtQ = tier;
+    window.__gpu = gpu;
+    const lose = gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
     const [mod, bytes] = await Promise.all([import('./game.js?v=' + BUILD), fetchWasm()]);
     window.__downloadMs = Math.round(performance.now() - window.__t0);
     $('fill').style.width = '100%';
-    $('status').textContent = 'Đã tải xong (' + (bytes.length / 1048576).toFixed(1) + ' MB). Bấm để bắt đầu.';
+    const qn = new URLSearchParams(location.search).get('q');
+    $('status').textContent = 'Đã tải xong (' + (bytes.length / 1048576).toFixed(1) + ' MB). Đồ hoạ: ' + (qn ? qn + ' (theo ?q=)' : ['Thấp', 'Vừa', 'Cao'][window.__twtQ] + ' (tự chọn)') + '. Bấm để bắt đầu.';
     const go = $('go');
     go.disabled = false;
     const start = async () => {
