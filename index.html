@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>The Walking Trade (Bevy, không asset)</title>
+<title>The Walking Trade (bản chỉ code)</title>
 <script>
 // Bộ thu lỗi đặt đầu trang: mọi lỗi console / lỗi không bắt đều vào window.__errors để bot và người chơi thấy.
 window.__errors = [];
 window.__t0 = performance.now();
+window.__build = 'a7525e527b21';
 (function () {
   var oe = console.error;
   console.error = function () {
@@ -19,143 +20,72 @@ window.__t0 = performance.now();
   window.addEventListener('unhandledrejection', function (e) { window.__errors.push('rejection: ' + (e.reason && e.reason.message || e.reason)); });
 })();
 </script>
-<style>
-  :root { --bg: #0d0f10; --ink: #e9e4d6; --dim: #9a9689; --accent: #f2c14e; --green: #2f8a4a; --line: #2a2e30; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
-    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; }
-  #twt-view { position: fixed; inset: 0; }
-  #twt-canvas { display: block; width: 100%; height: 100%; outline: none; }
-  #gate { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10;
-    background: radial-gradient(ellipse at 50% 30%, #23201a 0%, #0d0f10 70%); }
-  #card { width: min(680px, calc(100vw - 32px)); padding: 28px 30px 24px; box-sizing: border-box;
-    border: 1px solid var(--line); background: rgba(16, 18, 19, .92); }
-  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: .04em; font-weight: 800; color: var(--accent); }
-  .sub { margin: 0 0 18px; color: var(--dim); font-size: 14px; line-height: 1.5; }
-  .keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 18px; margin: 0 0 20px; padding: 0;
-    list-style: none; font-size: 13.5px; color: var(--ink); }
-  .keys b { display: inline-block; min-width: 54px; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
-  #bar { height: 8px; background: #1b1e20; border: 1px solid var(--line); margin-bottom: 8px; }
-  #fill { height: 100%; width: 0; background: var(--green); transition: width .15s linear; }
-  #status { font-size: 13px; color: var(--dim); min-height: 18px; margin-bottom: 14px; font-variant-numeric: tabular-nums; }
-  #go { font: inherit; font-size: 17px; font-weight: 700; padding: 11px 26px; border: 0; cursor: pointer;
-    background: var(--accent); color: #16130a; }
-  #go[disabled] { background: #3a3830; color: #7d7a70; cursor: default; }
-  #go:not([disabled]):hover { filter: brightness(1.08); }
-  #go:not([disabled]):active { transform: translateY(1px); }
-  #fatal { display: none; margin-top: 14px; padding: 10px 12px; border: 1px solid #7a2a24; background: #2a1210; color: #ffb4a8;
-    font: 12.5px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; max-height: 180px; overflow: auto; }
-  .foot { margin-top: 14px; font-size: 12px; color: var(--dim); }
-</style>
+<link rel="stylesheet" href="b/a7525e527b21/css/page.css?v=a7525e527b21">
+<link rel="stylesheet" href="b/a7525e527b21/css/hud.css?v=a7525e527b21">
 </head>
-<body>
+<body class="loading">
 <div id="twt-view"><canvas id="twt-canvas" tabindex="0"></canvas></div>
+<div id="hud"></div>
 <div id="gate">
   <div id="card">
+    <div class="kicker">BẢN DỰNG LẠI CHỈ BẰNG CODE · KHÔNG MỘT TỆP HÌNH HAY TIẾNG</div>
     <h1>THE WALKING TRADE</h1>
-    <p class="sub">Bản dựng lại bằng Bevy (Rust → WebAssembly), không dùng file asset nào: quán, đường phố, khách, zombie,
-      ánh sáng và âm thanh đều do code sinh ra lúc chạy. Bạn giữ một quán tạp hoá ven đường giữa đại dịch zombie.</p>
+    <p class="sub">Bạn giữ một quán tạp hoá ven đường giữa đại dịch zombie: dọn quán, bày hàng, đặt giá, bán cho người sống sót,
+      thuê người, đi nhặt đồ, chế tạo, dựng phòng thủ và sống sót qua các đợt raid. Quán, đường phố, con người, ánh sáng,
+      mưa và âm thanh đều được sinh ra ngay trong trình duyệt.</p>
     <ul class="keys">
       <li><b>WASD</b> đi lại</li>
       <li><b>Chuột</b> nhìn (hoặc phím mũi tên)</li>
       <li><b>Shift</b> chạy nhanh</li>
-      <li><b>E</b> dùng / giữ E để lục, quét, sửa</li>
-      <li><b>Chuột trái</b> vung vũ khí</li>
-      <li><b>Q</b> đặt giá món trên kệ</li>
-      <li><b>R</b> chọn món xếp lên kệ</li>
-      <li><b>X</b> thả đồ đang cầm</li>
-      <li><b>O</b> mở / đóng quán</li>
-      <li><b>F</b> dùng đồ hồi máu</li>
-      <li><b>B</b> dựng dây thép gai</li>
-      <li><b>Tab</b> ba lô, trợ giúp</li>
-      <li><b>?q=</b> low / med / high trên URL</li>
+      <li><b>E</b> tương tác / giữ để làm</li>
+      <li><b>Chuột trái</b> đánh / bắn</li>
+      <li><b>Chuột phải</b> ngắm</li>
+      <li><b>Tab</b> ba lô</li>
+      <li><b>K</b> kỹ năng</li>
+      <li><b>M</b> bản đồ</li>
+      <li><b>L</b> việc cần làm</li>
+      <li><b>H</b> trợ giúp</li>
+      <li><b>P</b> cài đặt</li>
     </ul>
     <div id="bar"><div id="fill"></div></div>
-    <div id="status">Đang tải…</div>
+    <div id="status">Đang khởi động…</div>
     <button id="go" disabled>Vào game</button>
-    <div id="fatal"></div>
-    <div class="foot">Cần trình duyệt có WebGL2. Bản <span id="build">45cc78fb5c69</span>.</div>
+    <pre id="fatal"></pre>
+    <div class="foot">Kỹ thuật ánh sáng, hậu kỳ, súng, hiệu ứng và âm thanh port từ <b>Saltline</b> của Felix Rieseberg.
+      Bộ dựng nhân vật port từ <b>Lanternfall</b> của loktar00. three.js r170 (MIT). Bản <span id="buildid">a7525e527b21</span>.
+      <a href="bevy/" id="oldlink">Bản Bevy cũ</a></div>
   </div>
 </div>
-<script type="module">
-const BUILD = '45cc78fb5c69';
-const EXPECTED = Number('36868714') || 0;
-const $ = id => document.getElementById(id);
-const fatal = msg => { const f = $('fatal'); f.style.display = 'block'; f.textContent = msg; $('status').textContent = 'Không khởi động được.'; };
-
-// Game gọi window.twtStage('ready') khi khung hình đầu đã vẽ.
-window.twtStage = name => {
-  if (name === 'ready') {
-    window.__ready = true;
-    window.__loadMs = Math.round(performance.now() - window.__t0);
-    $('gate').style.display = 'none';
-    $('twt-canvas').focus();
+<script>
+// Trang báo tiến độ: main.js gọi twtStage(tên) ở từng bước; 'ready' là game đã vẽ khung hình đầu.
+(function () {
+  var steps = ['boot', 'bake', 'sky', 'world', 'lights', 'ground', 'post', 'people', 'weapon', 'hud', 'compile', 'ready'];
+  var label = { boot: 'Đang khởi động…', bake: 'Đang nung vật liệu…', sky: 'Đang dựng bầu trời…', world: 'Đang dựng quán và đường phố…', lights: 'Đang thắp đèn…',
+    ground: 'Đang làm ướt mặt đường…', post: 'Đang dựng chuỗi hậu kỳ…', people: 'Đang dựng người và zombie…', weapon: 'Đang lắp súng…', hud: 'Đang dựng giao diện…',
+    compile: 'Đang biên dịch shader…', ready: 'Sẵn sàng.' };
+  var q = new URLSearchParams(location.search);
+  var auto = q.has('enter');
+  window.twtStage = function (name) {
+    var i = steps.indexOf(name); if (i < 0) return;
+    document.getElementById('fill').style.width = Math.round((i + 1) / steps.length * 100) + '%';
+    document.getElementById('status').textContent = label[name] + (name === 'ready' ? ' ' + ((performance.now() - window.__t0) / 1000).toFixed(1) + ' s' : '');
+    window.__stage = name;
+    if (name === 'ready') {
+      window.__downloadMs = Math.round(performance.now() - window.__t0);
+      var go = document.getElementById('go'); go.disabled = false; go.focus();
+      if (auto) enter();
+    }
+  };
+  function enter() {
+    document.body.classList.remove('loading'); document.body.classList.add('playing');
+    var c = document.getElementById('twt-canvas'); c.focus();
+    if (window.__twtEnter) window.__twtEnter();
+    window.__loadMs = 0; window.__ready = true;
   }
-};
-
-async function fetchWasm() {
-  const res = await fetch('game_bg.wasm?v=' + BUILD);
-  if (!res.ok) throw new Error('Tải game_bg.wasm thất bại: HTTP ' + res.status);
-  const total = Number(res.headers.get('content-length')) || EXPECTED;
-  if (!res.body) return new Uint8Array(await res.arrayBuffer());
-  const reader = res.body.getReader();
-  const chunks = [];
-  let got = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    got += value.length;
-    // content-length là cỡ đã nén khi máy chủ gzip; EXPECTED là cỡ thật.
-    const denom = Math.max(total, got, 1);
-    $('fill').style.width = Math.min(100, got / Math.max(EXPECTED, denom) * 100).toFixed(1) + '%';
-    $('status').textContent = 'Đang tải… ' + (got / 1048576).toFixed(1) + ' MB';
-  }
-  const out = new Uint8Array(got);
-  let o = 0;
-  for (const c of chunks) { out.set(c, o); o += c.length; }
-  return out;
-}
-
-(async () => {
-  try {
-    const gl = document.createElement('canvas').getContext('webgl2');
-    if (!gl) throw new Error('Trình duyệt này không có WebGL2, game không chạy được.');
-    // Tự chọn mức đồ hoạ theo GPU: 0 thấp (phần mềm, Intel HD/UHD, GPU điện thoại), 1 vừa (tích hợp khá), 2 cao (card rời).
-    // ?q=low|med|high ghi đè. Game còn tự hạ một mức nếu dưới 28 khung/giây suốt 5 giây.
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-    const gpu = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER) || '');
-    let tier = 2;
-    if (/swiftshader|llvmpipe|software|basic render|mali|adreno|powervr/i.test(gpu) || /intel/i.test(gpu) && !/iris|arc/i.test(gpu)) tier = 0;
-    else if (/iris|apple|radeon\(tm\) graphics|radeon graphics|vega/i.test(gpu) && !/rx|pro/i.test(gpu)) tier = 1;
-    if (tier > 0 && ((navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4)) tier -= 1;
-    window.__twtQ = tier;
-    window.__gpu = gpu;
-    const lose = gl.getExtension('WEBGL_lose_context');
-    if (lose) lose.loseContext();
-    const [mod, bytes] = await Promise.all([import('./game.js?v=' + BUILD), fetchWasm()]);
-    window.__downloadMs = Math.round(performance.now() - window.__t0);
-    $('fill').style.width = '100%';
-    const qn = new URLSearchParams(location.search).get('q');
-    $('status').textContent = 'Đã tải xong (' + (bytes.length / 1048576).toFixed(1) + ' MB). Đồ hoạ: ' + (qn ? qn + ' (theo ?q=)' : ['Thấp', 'Vừa', 'Cao'][window.__twtQ] + ' (tự chọn)') + '. Bấm để bắt đầu.';
-    const go = $('go');
-    go.disabled = false;
-    const start = async () => {
-      go.disabled = true;
-      $('status').textContent = 'Đang dựng thế giới…';
-      window.__t0 = performance.now();
-      try {
-        await mod.default({ module_or_path: bytes });
-      } catch (e) {
-        // winit thoát khỏi main bằng một ngoại lệ có chủ đích; không phải lỗi.
-        if (!String(e && e.message || e).includes('Using exceptions for control flow')) fatal(String(e && e.stack || e));
-      }
-    };
-    go.addEventListener('click', start, { once: true });
-  } catch (e) {
-    window.__errors.push('boot: ' + (e && e.message || e));
-    fatal(String(e && e.stack || e));
-  }
+  document.getElementById('go').addEventListener('click', enter);
+  window.twtFatal = function (msg) { var f = document.getElementById('fatal'); f.style.display = 'block'; f.textContent = msg; window.__fatal = msg; };
 })();
 </script>
+<script type="module" src="b/a7525e527b21/js/main.js?v=a7525e527b21"></script>
 </body>
 </html>
