@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>The Walking Trade (bản chỉ code)</title>
+<script>
+// Bộ thu lỗi đặt đầu trang: mọi lỗi console / lỗi không bắt đều vào window.__errors để bot và người chơi thấy.
+window.__errors = [];
+window.__t0 = performance.now();
+window.__build = 'f597544b6524';
+(function () {
+  var oe = console.error;
+  console.error = function () {
+    try { window.__errors.push(Array.prototype.map.call(arguments, String).join(' ')); } catch (e) {}
+    oe.apply(console, arguments);
+  };
+  window.addEventListener('error', function (e) { window.__errors.push('error: ' + (e.message || e)); });
+  window.addEventListener('unhandledrejection', function (e) { window.__errors.push('rejection: ' + (e.reason && e.reason.message || e.reason)); });
+})();
+</script>
+<link rel="stylesheet" href="b/f597544b6524/css/page.css?v=f597544b6524">
+<link rel="stylesheet" href="b/f597544b6524/css/hud.css?v=f597544b6524">
+</head>
+<body class="loading">
+<div id="twt-view"><canvas id="twt-canvas" tabindex="0"></canvas></div>
+<div id="hud"></div>
+<div id="gate">
+  <div id="card">
+    <div class="kicker">BẢN DỰNG LẠI CHỈ BẰNG CODE · KHÔNG MỘT TỆP HÌNH HAY TIẾNG</div>
+    <h1>THE WALKING TRADE</h1>
+    <p class="sub">Bạn giữ một quán tạp hoá ven đường giữa đại dịch zombie: dọn quán, bày hàng, đặt giá, bán cho người sống sót,
+      thuê người, đi nhặt đồ, chế tạo, dựng phòng thủ và sống sót qua các đợt raid. Quán, đường phố, con người, ánh sáng,
+      mưa và âm thanh đều được sinh ra ngay trong trình duyệt.</p>
+    <ul class="keys">
+      <li><b>WASD</b> đi lại</li>
+      <li><b>Chuột</b> nhìn (hoặc phím mũi tên)</li>
+      <li><b>Shift</b> chạy nhanh</li>
+      <li><b>E</b> tương tác / giữ để làm</li>
+      <li><b>Chuột trái</b> đánh / bắn</li>
+      <li><b>Chuột phải</b> ngắm</li>
+      <li><b>Tab</b> ba lô</li>
+      <li><b>K</b> kỹ năng</li>
+      <li><b>M</b> bản đồ</li>
+      <li><b>L</b> việc cần làm</li>
+      <li><b>H</b> trợ giúp</li>
+      <li><b>P</b> cài đặt</li>
+    </ul>
+    <div id="bar"><div id="fill"></div></div>
+    <div id="status">Đang khởi động…</div>
+    <button id="go" disabled>Vào game</button>
+    <pre id="fatal"></pre>
+    <div class="foot">Kỹ thuật ánh sáng, hậu kỳ, súng, hiệu ứng và âm thanh port từ <b>Saltline</b> của Felix Rieseberg.
+      Bộ dựng nhân vật port từ <b>Lanternfall</b> của loktar00. three.js r170 (MIT). Bản <span id="buildid">f597544b6524</span>.
+      <a href="../" id="oldlink">Bản Bevy cũ</a></div>
+  </div>
+</div>
+<script>
+// Trang báo tiến độ: main.js gọi twtStage(tên) ở từng bước; 'ready' là game đã vẽ khung hình đầu.
+(function () {
+  var steps = ['boot', 'bake', 'sky', 'world', 'lights', 'ground', 'post', 'people', 'weapon', 'hud', 'compile', 'ready'];
+  var label = { boot: 'Đang khởi động…', bake: 'Đang nung vật liệu…', sky: 'Đang dựng bầu trời…', world: 'Đang dựng quán và đường phố…', lights: 'Đang thắp đèn…',
+    ground: 'Đang làm ướt mặt đường…', post: 'Đang dựng chuỗi hậu kỳ…', people: 'Đang dựng người và zombie…', weapon: 'Đang lắp súng…', hud: 'Đang dựng giao diện…',
+    compile: 'Đang biên dịch shader…', ready: 'Sẵn sàng.' };
+  var q = new URLSearchParams(location.search);
+  var auto = q.has('enter');
+  window.twtStage = function (name) {
+    var i = steps.indexOf(name); if (i < 0) return;
+    document.getElementById('fill').style.width = Math.round((i + 1) / steps.length * 100) + '%';
+    document.getElementById('status').textContent = label[name] + (name === 'ready' ? ' ' + ((performance.now() - window.__t0) / 1000).toFixed(1) + ' s' : '');
+    window.__stage = name;
+    if (name === 'ready') {
+      window.__downloadMs = Math.round(performance.now() - window.__t0);
+      var go = document.getElementById('go'); go.disabled = false; go.focus();
+      if (auto) enter();
+    }
+  };
+  function enter() {
+    document.body.classList.remove('loading'); document.body.classList.add('playing');
+    var c = document.getElementById('twt-canvas'); c.focus();
+    if (window.__twtEnter) window.__twtEnter();
+    window.__loadMs = 0; window.__ready = true;
+  }
+  document.getElementById('go').addEventListener('click', enter);
+  window.twtFatal = function (msg) { var f = document.getElementById('fatal'); f.style.display = 'block'; f.textContent = msg; window.__fatal = msg; };
+})();
+</script>
+<script type="module" src="b/f597544b6524/js/main.js?v=f597544b6524"></script>
+</body>
+</html>
