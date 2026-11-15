@@ -40,7 +40,7 @@ const QUALITY = [
 
 // Optional view plug-ins (js/plug/<name>.js exporting install(G)): each upgrades one part of the picture or sound and can
 // be switched off with ?noplug=name,name (or all). ?plug=name loads one that is not in the default list yet.
-const PLUGINS = ['dress', 'env', 'fxaudio'];
+const PLUGINS = ['dress', 'env', 'fxaudio', 'loot'];
 const G = window.__G = { params, U, postFx: { flash: 0, hurt: 0 }, errors: [], t: 0, dt: 1 / 60, frames: 0, updaters: [], preRender: [], plugins: {}, THREE };
 const seen = new Set();
 G.prof = {};
@@ -102,7 +102,8 @@ async function bootGame() {
   let people = peopleStub;
   if (params.ppl !== 'none') {
     stage('people');
-    try { const m = await import('./people.js'); people = G.people = m.createPeople({ scene: G.scene, camera: G.camera, renderer, quality: G.quality }); }
+    // robots by default (js/robots/, original cast); ?people=lf falls back to the Lanternfall humans of people.js
+    try { const m = await import(params.people === 'lf' ? './people.js' : './robots/people-robots.js'); people = G.people = m.createPeople({ scene: G.scene, camera: G.camera, renderer, quality: G.quality }); }
     catch (e) { console.warn('[people] not available: ' + (e && e.message)); }
   }
   scene.install({ spawn: (mesh, matName, tr) => sg.spawn(mesh, matName, tr), people });
@@ -176,10 +177,21 @@ const _c = new THREE.Vector3(), _f = new THREE.Vector3();
 function applyEnv(dt) {
   const E = mat.ENV, fx = G.ctx.fx;
   const night = E.sky_col[3], raid = E.horizon[3], sunK = E.sun_dir[3] / 2.865;
+  // Daylight lift (view only; ?daylift=0 keeps the pure Saltline storm-dusk table): the rules' light table keeps the sun at
+  // 8-20 degrees under a heavy cloud deck all day, which read as dusk at 10 AM next to the original game's bright day
+  // (cmp/rebuild/sbs/VERDICT.md). Around midday raise the sun, open the cloud deck, cool the sky and whiten the sun.
+  const hour = G.g.hour(), ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  const m = params.daylift === '0' ? 0 : ss(7.0, 9.5, hour) * (1 - ss(15.5, 18.0, hour)) * (1 - raid) * (1 - 0.7 * fx.rain);
+  const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  let sd = [E.sun_dir[0], E.sun_dir[1], E.sun_dir[2]];
+  if (m > 0) { const hl = Math.hypot(sd[0], sd[2]) || 1, el = Math.asin(Math.min(1, sd[1])), e2 = el + (0.72 - el) * m * 0.85; sd = [sd[0] / hl * Math.cos(e2), Math.sin(e2), sd[2] / hl * Math.cos(e2)]; }
   G.sky.update({
-    sunDir: E.sun_dir, sunCol: E.sun_col, sunK, zen: [E.sky_col[0] * 0.42, E.sky_col[1] * 0.58, E.sky_col[2] * 0.73],
-    hor: E.horizon, horAway: E.zenith, fog: E.fog_col, night, raid, cloud: E.zenith[3],
+    sunDir: sd, sunCol: mix3(E.sun_col, [1.0, 0.95, 0.86], m * 0.8), sunK,
+    zen: mix3([E.sky_col[0] * 0.42, E.sky_col[1] * 0.58, E.sky_col[2] * 0.73], [0.10, 0.22, 0.50], m),
+    hor: mix3(E.horizon, [0.80, 0.78, 0.72], m * 0.7), horAway: mix3(E.zenith, [0.42, 0.56, 0.78], m * 0.9), fog: mix3(E.fog_col, [0.55, 0.62, 0.70], m * 0.6),
+    night, raid, cloud: E.zenith[3] * (1 - 0.8 * m),
   }, dt);
+  G.dayLift = m;
   const sun = G.lights.sun, S = G.lights.S;
   sun.intensity = E.sun_dir[3] * Math.PI;
   const texel = (2 * S) / sun.shadow.mapSize.x;

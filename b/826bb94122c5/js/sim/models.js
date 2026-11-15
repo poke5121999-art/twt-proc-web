@@ -162,14 +162,16 @@ export function facade(mb) {
   }
   // Máng xối dọc mép mái và cục nóng có quạt.
   mb.tube(v(-5.3, 3.22, 5.31), v(9.8, 3.22, 5.31), 0.06, 0.06, 8, hex(0x4a4f52), METAL);
-  mb.push_axis(v(9.25, 0.75, 5.57), v(9.25, 0.75, 5.6));
+  // [SUA] quat nam tren cuc nong o goc tay mat tien (x = MEDICAL[0] + 0,5 = -9,25; truoc day x = +9,25 nen quat treo giua khong).
+  mb.push_axis(v(-9.25, 0.75, 5.57), v(-9.25, 0.75, 5.6));
   mb.lathe(ZERO, [[0.32, 0.0], [0.32, 0.03], [0.0, 0.03]], 16, false, hex(0x2a2d30), METAL);
   mb.pop();
   for (let k = 0; k < 4; k++) {
-    mb.cube(v(9.25, 0.48 + k * 0.18, 5.59), v(0.62, 0.015, 0.02), hex(0x8a8f94), METAL);
+    mb.cube(v(-9.25, 0.48 + k * 0.18, 5.59), v(0.62, 0.015, 0.02), hex(0x8a8f94), METAL);
   }
   // Dây điện từ cột bên kia đường vào góc mái.
-  const a = v(-12.0, 7.5, 12.6), b = v(-5.2, 3.55, 5.3);
+  // [SUA] dau day noi vao cot dien ben duong (cot o z = 12,6 + STREET_DZ) va dau cot goc mai; truoc day ca hai dau deu ho.
+  const a = v(-12.0, 7.5, 12.6 + lay.STREET_DZ), b = v(-5.33, 3.24, 5.33);
   const path = [];
   for (let k = 0; k <= 8; k++) {
     const t = k / 8.0;
@@ -323,6 +325,8 @@ export function item(mb, item, p, k) {
     case 1:
       mb.lathe(ZERO, [[0.0, 0.0], [0.04, 0.0], [0.042, 0.01], [0.042, 0.14], [0.03, 0.17], [0.017, 0.19], [0.017, 0.235], [0.0, 0.235]], 10, true, c, GLASS);
       mb.lathe(ZERO, [[0.043, 0.04], [0.043, 0.11]], 10, false, c2, FLAT);
+      // [SUA] ruot chai (nuoc ben trong): kinh trong 32 % dat tren nen xam gan nhu vo hinh, chai chi con thay nhan va nap.
+      mb.lathe(ZERO, [[0.0, 0.004], [0.037, 0.004], [0.039, 0.012], [0.039, 0.138], [0.027, 0.168], [0.0, 0.168]], 10, false, c.map((x) => x * 0.45), FLAT);
       mb.lathe(ZERO, [[0.02, 0.222], [0.02, 0.242], [0.0, 0.242]], 8, false, hex(0xb9a44a), METAL);
       break;
     case 6:

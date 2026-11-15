@@ -148,6 +148,8 @@ function new_customer(g) {
     desire,
     desire_mul: g.rng.range(0.75, 1.1),
     basket: [],
+    /// Đợt 13: số món lẻ khách này định mua (game.basket_want: 1-3; luật gốc 0,7 x 6).
+    want: game.basket_want(g.rng),
     slot: null,
     path: game.customer_route(spawn).slice(1),
     wait: 0.0,
@@ -250,14 +252,13 @@ function evaluate(g, c) {
   const chance = score / (score + 0.7);
   c.desire_mul -= 0.1;
   if (g.rng.chance(chance)) {
-    g.shelves[sh].slots[s] = null;
-    g.shelves[sh].dirty = true;
+    g.shelves[sh].take(s);
     c.basket.push([item, price]);
     g.add_rep_flat(0.0066);
     g.add_rep(value * 1.5 >= price ? 0.06 : -0.02);
     g.play('pick', 0.35);
-    // Đủ 70% giỏ (sức chứa 6) thì ra quầy.
-    if (c.basket.length >= 0.7 * 6.0) {
+    // Luật gốc: đủ 70% giỏ (sức chứa 6) thì ra quầy. Đợt 13: đủ `want` món (1-3) thì ra quầy.
+    if (c.basket.length >= (c.want || game.BASKET_ORIG)) {
       return finish_browse(g, c);
     }
   }
@@ -331,10 +332,9 @@ function tick_customers(g, dt) {
       const drained = c.basket.splice(0, c.basket.length);
       for (const [it] of drained) {
         for (let sh = 0; sh < g.shelves.length; sh++) {
-          const s = g.shelf_free(sh, 0);
+          const s = g.shelves[sh].place_slot(it, null, 1);
           if (s !== null) {
-            g.shelves[sh].slots[s] = it;
-            g.shelves[sh].dirty = true;
+            g.shelves[sh].put(s, it, 1);
             break;
           }
         }
@@ -564,6 +564,9 @@ export function finish_payment(g) {
 }
 
 function finish_sale(g, i, total0) {
+  // Đợt 13: sổ giỏ từng lần bán trong ngày (bot đọc `__twt.sales`): số món lẻ khách mua.
+  if (g.sales === undefined) g.sales = [];
+  if (g.sales.length < 64) g.sales.push(g.customers[i].basket.length);
   const first = g.customers[i].basket.length > 0 ? items.ival(g.customers[i].basket[0][0]) : 0;
   const sold = g.customers[i].basket.splice(0, g.customers[i].basket.length).map((b) => b[0]);
   for (const it of sold) {

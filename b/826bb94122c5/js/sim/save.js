@@ -87,6 +87,7 @@ export function save_string(g) {
     g.stock_sel,
   ];
   const shelf = (s) => s.slots.map((x) => String(x !== null ? x : -1)).join(',');
+  const shelfn = (s) => s.counts.map((x) => String(x | 0)).join(',');
   const done = g.done.map((d) => (d ? 1 : 0));
   const caches = [];
   for (const p of g.props) if (p.kind.k === 'Cache') caches.push(p.kind.c ? 1 : 0);
@@ -100,6 +101,8 @@ export function save_string(g) {
     `inv=${sparse(g.inv, (_, n) => n === 0)}`,
     `shelf0=${shelf(g.shelves[0])}`,
     `shelf1=${shelf(g.shelves[1])}`,
+    `shelfn0=${shelfn(g.shelves[0])}`,
+    `shelfn1=${shelfn(g.shelves[1])}`,
     `done=${nums(done)}`,
     `caches=${nums(caches)}`,
     `gifts=${nums(gifts)}`,
@@ -230,6 +233,11 @@ export function load(g, slot, prev) {
     const vs = parse(field(s, sh === 0 ? 'shelf0' : 'shelf1')).slice(0, g.shelves[sh].slots.length);
     vs.forEach((v, k) => {
       g.shelves[sh].slots[k] = v >= 0 && v < N_ITEMS ? v : null;
+      g.shelves[sh].counts[k] = g.shelves[sh].slots[k] === null ? 0 : 1;
+    });
+    // Bản lưu cũ không có `shelfnN`: mỗi ô 1 món lẻ.
+    parse(field(s, sh === 0 ? 'shelfn0' : 'shelfn1')).slice(0, g.shelves[sh].slots.length).forEach((v, k) => {
+      if (g.shelves[sh].slots[k] !== null) g.shelves[sh].counts[k] = Math.max(1, v);
     });
     g.shelves[sh].dirty = true;
   }

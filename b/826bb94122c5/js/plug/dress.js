@@ -217,9 +217,13 @@ function poster(k, r, w, h) {
   if (r() < 0.5) { k.push().at(w * 0.35, -h * 0.4, 0.007, 0, 0, 0.6); k.add(new THREE.PlaneGeometry(w * 0.4, h * 0.25), c); k.pop(); }
 }
 function sawhorse(k) {
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) { k.push().at(sx * 0.9, 0.45, sz * 0.18, 0, sz * 0.38); k.box(0.07, 0.95, 0.05, 'w#6a5236', 0, 0, 0, 0.01); k.pop(); }
-  for (let i = 0; i < 2; i++) for (let s = 0; s < 6; s++) k.box(0.34, 0.2, 0.03, s % 2 ? 'm#c0bcae' : 'm#b0301e', -0.85 + s * 0.34, 0.6 + i * 0.32, 0.25, 0.006);
-  k.box(2.1, 0.06, 0.06, 'w#5a4630', 0, 0.38, 0, 0.01);
+  // A-frame legs meeting under the top beam; the striped boards are nailed to the front legs, leaning with them
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) { k.push().at(sx * 0.9, 0.45, sz * 0.18, 0, -sz * 0.38); k.box(0.07, 0.95, 0.05, 'w#6a5236', 0, 0, 0, 0.01); k.pop(); }
+  for (let i = 0; i < 2; i++) {
+    const y = 0.5 + i * 0.26, z = 0.18 - (y - 0.45) * Math.tan(0.38) + 0.027 / Math.cos(0.38) + 0.015;
+    for (let s = 0; s < 6; s++) { k.push().at(-0.85 + s * 0.34, y, z, 0, -0.38); k.box(0.34, 0.2, 0.03, s % 2 ? 'm#c0bcae' : 'm#b0301e', 0, 0, 0, 0.006); k.pop(); }
+  }
+  k.box(2.1, 0.06, 0.06, 'w#5a4630', 0, 0.9, 0, 0.01);
 }
 function roofUnit(k, r) {
   k.box(1.3, 0.9, 1.0, 'm#9a9c96', 0, 0.55, 0, 0.04);
@@ -642,6 +646,7 @@ function buildInterior(k, r) {
     k.tube(V(x, Y, z), V(x, 2.66, z), 0.005, 'l#151515', 3);
     k.add(new THREE.ConeGeometry(0.2, 0.14, 16, 1, true).translate(x, 2.6, z), 'm#2c4a3a');
     k.cyl(0.035, 0.03, 'm#2c4a3a', x, 2.68, z, 8);
+    k.cyl(0.012, 0.1, 'm#2c4a3a', x, 2.62, z, 8); // lamp holder from the shade cap down to the bulb
     k.add(new THREE.SphereGeometry(0.045, 8, 6).translate(x, 2.55, z), 'inlamp');
   }
   // ventilation grille high on the back wall
@@ -681,7 +686,7 @@ function buildFar(k, r) {
   k.push().at(-96, 0, -46); P.waterTower(k, 'z#6a6e70'); k.pop();
   k.push().at(118, 0, 132); P.radioMast(k, 72, 'z#7a4a40'); k.pop();
   for (const y of [72.4, 48, 24]) k.add(new THREE.OctahedronGeometry(0.6).translate(118, y, 132), 'blink');
-  k.add(new THREE.OctahedronGeometry(0.5).translate(-96, 31, -46), 'blink');
+  k.add(new THREE.OctahedronGeometry(0.5).translate(-96, 30.6, -46), 'blink'); // on the tank's top cap (30.2)
 }
 
 let SKY = null;

@@ -55,8 +55,9 @@ export async function install(G) {
     G.updaters.push(['env-post', (dt) => {
       const night = sky.uniforms.uNight.value, rain = G.ctx.fx.rain || 0;
       const inside = !!G.inside;
-      const maxE = inside ? lerp(2.0, 1.45, night) : lerp(2.0, 1.35, night);
-      const key = lerp(0.12, 0.08, night) * lerp(1, 0.9, rain);
+      const maxE = (inside ? lerp(2.0, 1.45, night) : lerp(2.0, 1.35, night)) * (1 + 0.35 * (G.dayLift || 0));
+      const lift = G.dayLift || 0; // main.js daylight lift: midday reads as day (brighter key), not storm dusk
+      const key = lerp(0.12, 0.08, night) * lerp(1, 0.9, rain) * (1 + 0.7 * lift);
       for (const u of expo) { u.uMaxE.value = maxE; u.uKey.value = key; u.uMinE.value = 0.45; }
       TUNE.bloom = lerp(0.065, 0.085, night); TUNE.streakThreshold = lerp(2.2, 1.5, night); TUNE.streak = lerp(0.03, 0.045, night);
       if (wasInside && !inside) outT = 2.5;

@@ -41,10 +41,11 @@ export function pallet(mb, p, yaw, r) {
     const x = r.range(-0.01, 0.01);
     mb.cube(v3(x, 0.133, z), v3(1.2, 0.022, 0.1), tone(r), WOOD);
   }
+  // [SUA] xa ngang chay vuong goc voi van mat (truoc day song song nen van mat va xa ho nhau 1 cm, hai van giua khong co gi do).
   for (const z of [-0.45, 0.0, 0.45]) {
-    mb.cube(v3(0.0, 0.1, z), v3(1.2, 0.022, 0.1), tone(r), WOOD);
+    mb.cube(v3(z * (0.55 / 0.45), 0.111, 0.0), v3(0.1, 0.022, 1.0), tone(r), WOOD);
     for (const x of [-0.55, 0.0, 0.55]) {
-      mb.cube(v3(x, 0.05, z), v3(0.1, 0.078, 0.1), tone(r), WOOD);
+      mb.cube(v3(x, 0.061, z), v3(0.1, 0.078, 0.1), tone(r), WOOD);
     }
   }
   for (const x of [-0.55, 0.0, 0.55]) {
@@ -108,10 +109,12 @@ export function container(mb, p, yaw, col, r) {
     mb.cube(v3(0.0, 0.08, z), v3(l, 0.16, 0.16), frame, METAL);
   }
   const xd = l * 0.5 + 0.005;
+  // [SUA] canh cua phang voi khung dau (truoc day then cua dung cach vach ton 9 cm, khong cham gi).
+  mb.cube(v3(l * 0.5 - 0.03, h * 0.5, 0.0), v3(0.06, h - 0.3, w - 0.3), c, CORRUGATED);
   for (let k = 0; k < 4; k++) {
     const z = -0.85 + k * 0.567;
-    mb.cyl(v3(xd + 0.03, 0.2, z), 0.022, 0.022, h - 0.4, 6, hex(0x5a5c5e), METAL);
-    mb.cube(v3(xd + 0.03, 1.1, z + 0.06), v3(0.04, 0.12, 0.1), hex(0x3a3c3e), METAL);
+    mb.cyl(v3(xd + 0.01, 0.2, z), 0.022, 0.022, h - 0.4, 6, hex(0x5a5c5e), METAL);
+    mb.cube(v3(xd + 0.015, 1.1, z + 0.06), v3(0.04, 0.12, 0.1), hex(0x3a3c3e), METAL);
   }
   mb.cube(v3(xd, h * 0.5, 0.0), v3(0.02, h - 0.3, 0.03), frame, METAL);
   mb.pop();
