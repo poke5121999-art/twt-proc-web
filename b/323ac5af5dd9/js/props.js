@@ -261,9 +261,11 @@ export function floodMast(k, opts, info) {
   // platform and light heads
   k.box(2.4, 0.08, 1.4, 'grating', 0, H, 0, 0.01);
   k.tube(V(-1.2, H + 0.9, 0.7), V(1.2, H + 0.9, 0.7), 0.025, 'galv', 5);
+  for (const x of [-1.2, 0, 1.2]) k.tube(V(x, H + 0.03, 0.66), V(x, H + 0.92, 0.7), 0.02, 'galv', 4); // rail posts on the platform
   const heads = opts.heads || 4;
   for (let i = 0; i < heads; i++) {
     const x = (i - (heads - 1) / 2) * 0.6;
+    k.tube(V(x, H + 0.9, 0.7), V(x, H + 0.55, 0.75), 0.018, 'galv', 4); // each head hangs from the rail on a bracket
     k.push().at(x, H + 0.55, 0.75, 0, -0.75 + (i % 2) * 0.15);
     k.box(0.5, 0.36, 0.22, 'darkSteel', 0, 0, 0, 0.04);
     k.box(0.44, 0.3, 0.03, 'emitSodium', 0, 0, 0.12, 0.01);
@@ -631,8 +633,13 @@ export function car(k, o = {}) {
   // wear plates / rust bloom on the roof and sills
   if (wreck > 0) {
     for (let i = 0; i < 3 + wreck * 4; i++) {
-      const x = r.range(-1.2, 1.2), z = r.range(-hl + 0.4, hl - 0.4);
-      k.box(r.range(0.15, 0.45), 0.006, r.range(0.15, 0.4), 'u#5a3220', x * 0.6, r() < 0.5 ? 1.39 : 0.835, z * 0.5, 0.002);
+      const x = r.range(-1.2, 1.2), z = r.range(-hl + 0.4, hl - 0.4), w = r.range(0.15, 0.45), d = r.range(0.15, 0.4), roof = r() < 0.5, u = z / (hl - 0.4);
+      // the body was built turned a quarter: its length runs along -z here (outer z = -inner x)
+      if (roof) k.box(w, 0.006, d, 'u#5a3220', x * 0.47, 1.388, 0.35 + u * (0.7 - d / 2), 0.002);
+      else {
+        const xi = hl - 0.9 + (u + 1) / 2 * 0.55, y = 0.87 - 0.1 * (xi - (hl - 0.95)) / 0.8 + 0.004;
+        k.push().at(x * 0.5, y, -xi, 0, -Math.atan(0.125)); k.box(w, 0.006, d * 0.6, 'u#5a3220', 0, 0, 0, 0.002); k.pop();
+      }
     }
   }
 }
@@ -710,17 +717,20 @@ export function wheelieBin(k, o = {}) {
 export function rubblePile(k, r, size, keys) {
   const n = Math.round(10 * size * size + 6);
   const ks = keys || ['c#8a8780', 'c#6f6c66', 'b#7a5040', 'c#9a968e', 'b#6a4434'];
+  // a low mound of broken concrete and dust: every chunk rests on it or on the ground (no chunk hangs in the air)
+  const R = size * 1.05, Hm = size * 0.34, hm = (d) => (d >= R ? 0 : Hm * (1 - (d / R) * (d / R)));
+  k.add(lathe([[0, 0], [R, 0], [R * 0.9, Hm * 0.19], [R * 0.75, Hm * 0.44], [R * 0.55, Hm * 0.7], [R * 0.3, Hm * 0.91], [0, Hm]], 9), ks[1]);
   for (let i = 0; i < n; i++) {
     const a = r() * Math.PI * 2, d = Math.sqrt(r()) * size;
     const sz = (0.12 + r() * 0.42) * (1 - d / size * 0.5);
-    const y = Math.max(0, (size - d) * 0.45 * r()) + sz * 0.3;
+    const y = hm(d) * (0.7 + 0.3 * r()) + sz * 0.12;
     k.push().at(Math.cos(a) * d, y, Math.sin(a) * d, r() * 6, r() * 0.8 - 0.4, r() * 0.8 - 0.4);
     k.box(sz * (0.8 + r()), sz * (0.4 + r() * 0.5), sz * (0.7 + r() * 0.6), ks[Math.floor(r() * ks.length)], 0, 0, 0, sz > 0.3 ? sz * 0.12 : 0);
     k.pop();
   }
   for (let i = 0; i < Math.round(size * 3); i++) {
     const a = r() * 6.28, d = r() * size * 0.7;
-    const p0 = V(Math.cos(a) * d, 0.05 + r() * size * 0.3, Math.sin(a) * d);
+    const p0 = V(Math.cos(a) * d, hm(d) * (0.4 + 0.5 * r()), Math.sin(a) * d);
     const p1 = p0.clone().add(V(r() - 0.5, 0.2 + r() * 0.6, r() - 0.5));
     k.tube(p0, p1, 0.008, 'u#4a2a1a', 4);
   }
@@ -801,7 +811,7 @@ export function antenna(k, o = {}) {
 
 export function billboard(k, o = {}) {
   const W = o.w || 6, H = o.h || 3, post = o.post || 4, m = 'u#5a4030';
-  for (const x of [-W * 0.3, W * 0.3]) { k.box(0.3, post, 0.3, 'm#3a3e40', x, post / 2, -0.3, 0.02); for (let i = 0; i < 4; i++) k.tube(V(x - 0.15, post * i / 4, -0.15), V(x + 0.15, post * (i + 1) / 4, -0.45), 0.02, m, 4); }
+  for (const x of [-W * 0.3, W * 0.3]) { k.box(0.3, post + H * 0.6, 0.3, 'm#3a3e40', x, (post + H * 0.6) / 2, -0.2, 0.02); for (let i = 0; i < 4; i++) k.tube(V(x - 0.15, post * i / 4, -0.05), V(x + 0.15, post * (i + 1) / 4, -0.35), 0.02, m, 4); }
   k.box(W + 0.2, H + 0.2, 0.15, 'm#2a2e30', 0, post + H / 2, 0, 0.03);
   const r = rng(o.seed || 'bb');
   const pal = ['l#c8b070', 'l#8a3a2a', 'l#3a6a8a', 'l#d0ccc0', 'l#2a4a3a', 'l#b85a2a'];
@@ -814,6 +824,7 @@ export function billboard(k, o = {}) {
   k.box(W * 0.5, H * 0.18, 0.012, 'l#e8e2d0', -W * 0.1, post + H * 0.7, 0.09, 0.002);
   k.box(W + 0.2, 0.05, 0.7, 'm#2a2e30', 0, post - 0.1, 0.3, 0.01);
   k.tube(V(-W / 2, post + 0.9, 0.62), V(W / 2, post + 0.9, 0.62), 0.015, 'm#2a2e30', 4);
+  for (const x of [-W / 2, 0, W / 2]) k.tube(V(x, post - 0.08, 0.62), V(x, post + 0.92, 0.62), 0.015, 'm#2a2e30', 4);
   for (const x of [-W / 3, 0, W / 3]) { k.tube(V(x, post + H + 0.1, 0.05), V(x, post + H + 0.5, 0.6), 0.02, 'm#2a2e30', 4); k.box(0.3, 0.1, 0.18, 'm#2a2e30', x, post + H + 0.5, 0.65, 0.02); k.box(0.24, 0.02, 0.12, 'lamp', x, post + H + 0.44, 0.65, 0.005); }
 }
 
@@ -923,7 +934,11 @@ export function skipRusty(k, r) {
   k.box(2.0, 0.08, 1.7, 'u#5a3020', 0, 0.04, 0, 0.01);
   for (const sz of [-1, 1]) { const end = new THREE.Shape(); end.moveTo(-1.0, 0); end.lineTo(1.0, 0); end.lineTo(1.6, 1.2); end.lineTo(-1.6, 1.2); k.add(extrude(end, 0.05, 0.01, 1), 'u#6a3a24', new THREE.Matrix4().makeTranslation(0, 0, sz * 0.85)); }
   for (const sx of [-1, 1]) { k.box(0.12, 0.1, 1.9, 'u#4a2a1a', sx * 1.55, 1.15, 0, 0.02); k.add(new THREE.TorusGeometry(0.12, 0.025, 4, 10), 's#4a3a2a', new THREE.Matrix4().makeTranslation(sx * 1.25, 0.9, 0.9)); }
-  for (let i = 0; i < 10; i++) { k.push().at(r.range(-1, 1), r.range(0.3, 1.05), r.range(-0.6, 0.6), r() * 6, r() - 0.5, r() - 0.5); k.box(r.range(0.2, 0.7), r.range(0.05, 0.2), r.range(0.1, 0.4), r.pick(['w#6a5236', 'c#8a8680', 'l#2a2c2e']), 0, 0, 0, 0.01); k.pop(); }
+  for (let i = 0; i < 10; i++) {
+    const x = r.range(-1, 1); r.range(0.3, 1.05); const z = r.range(-0.6, 0.6), ry = r() * 6, rx = (r() - 0.5) * 0.5, rz = (r() - 0.5) * 0.5;
+    const w = r.range(0.2, 0.7), h = r.range(0.05, 0.2), d = r.range(0.1, 0.4), key = r.pick(['w#6a5236', 'c#8a8680', 'l#2a2c2e']);
+    k.push().at(x, 0.08 + h * 0.4, z, ry, rx, rz); k.box(w, h, d, key, 0, 0, 0, 0.01); k.pop(); // on the floor (tilted ends dip into it)
+  }
 }
 
 export function generator(k) {
@@ -961,10 +976,16 @@ export function pylon(k, H, key) {
       k.tube(V(a[0] * w0, y0, a[1] * w0), V(b[0] * w1, y1, b[1] * w1), H * 0.0015, m, 3);
     }
   }
+  const wAt = (y) => base + (top - base) * Math.min(1, y / (H * 0.85));
   for (const [y, l] of [[H * 0.62, H * 0.22], [H * 0.78, H * 0.17], [H * 0.9, H * 0.12]]) {
-    k.tube(V(-l, y, 0), V(l, y, 0), H * 0.004, m, 4);
-    for (const s of [-1, 1]) { k.tube(V(s * l, y, 0), V(s * top * 2, y + H * 0.06, 0), H * 0.002, m, 3); k.tube(V(s * l, y, 0), V(s * l, y - H * 0.04, 0), H * 0.002, m, 3); }
+    const w = wAt(y), y2 = y + H * 0.06, w2 = wAt(y2);
+    for (const zs of [-1, 1]) {
+      k.tube(V(-l, y, zs * w), V(l, y, zs * w), H * 0.004, m, 4);
+      for (const s of [-1, 1]) k.tube(V(s * l, y, zs * w), V(s * w2, y2, zs * w2), H * 0.002, m, 3);
+    }
+    for (const s of [-1, 1]) { k.tube(V(s * l, y, -w), V(s * l, y, w), H * 0.002, m, 3); k.tube(V(s * l, y, 0), V(s * l, y - H * 0.04, 0), H * 0.002, m, 3); }
   }
+  for (const [a, b] of [[1, 1], [1, -1], [-1, -1], [-1, 1]]) k.tube(V(a * top, H * 0.85, b * top), V(0, H * 0.85, 0), H * 0.002, m, 3);
   k.tube(V(0, H * 0.85, 0), V(0, H, 0), H * 0.003, m, 3);
 }
 

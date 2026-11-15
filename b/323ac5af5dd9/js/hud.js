@@ -24,6 +24,7 @@ import * as save from './sim/save.js';
 import * as cinem from './sim/cine.js';
 import * as player from './sim/player.js';
 import * as data from './sim/data.js';
+import * as lay from './sim/lay.js';
 import { Y } from './sim/vec.js';
 import * as icons from './icons.js';
 
@@ -370,7 +371,8 @@ function template() {
   <svg class="hd-ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="15" class="trk"/><circle cx="20" cy="20" r="15" class="val" data-r="ringv"/></svg>
   <i class="dot"></i>
 </div>
-<div class="hd-prompt hx" data-r="prompt"><span class="ic" data-r="pmouse" hidden></span><kbd data-r="pkey" hidden></kbd><span class="lbl" data-r="plabel"></span><span class="pct" data-r="ppct" hidden></span></div>
+<div class="hd-prompt hx" data-r="prompt"><span class="ic" data-r="pmouse" hidden></span><kbd data-r="pkey" hidden></kbd><span class="lbl" data-r="plabel"></span><span class="pct" data-r="ppct" hidden></span><i class="bar" data-r="pbar" hidden><b data-r="pbarv"></b></i></div>
+<div class="hd-root hd-feed" data-r="feed"></div>
 <div class="hd-notice hx" data-r="notice"><span data-r="noticet"></span></div>
 <div class="hd-root hd-hint" data-r="hint"></div>
 <div class="hd-root hd-slots">
@@ -426,6 +428,47 @@ function pick_card(k) {
     case 'Craft': g.craft_sel = k; break;
     case 'Trade': g.ev.sel = k; break;
     default: break;
+  }
+}
+
+// ---------- loot feed (left): one line per item kind picked up, "+4 Unlabelled Tin" with its icon, fades after ~4 s ----------
+const FEED = new Map();
+const FEED_LIFE = 4.0, FEED_MAX = 7;
+/** Plug-in loot.js calls this for every item that reaches the player (presentation only; the rules already gave it). */
+export function loot_feed(i, n = 1) {
+  const R = HS.R;
+  if (R === null || !R.feed) return;
+  let row = FEED.get(i);
+  if (row === undefined) {
+    const el = document.createElement('div');
+    el.className = 'hd-feed-r';
+    el.innerHTML = '<span class="ic"></span><b></b><span class="nm"></span>';
+    R.feed.appendChild(el);
+    row = { el, n: 0, t: 0, ic: false };
+    FEED.set(i, row);
+    while (FEED.size > FEED_MAX) { const [k, old] = FEED.entries().next().value; old.el.remove(); FEED.delete(k); }
+  }
+  row.n += n;
+  row.t = 0;
+  row.el.querySelector('b').textContent = `+${row.n}`;
+  row.el.querySelector('.nm').textContent = iname(i);
+  row.el.classList.remove('out', 'bump');
+  void row.el.offsetWidth;
+  row.el.classList.add('bump');
+  feed_icon(i, row);
+}
+function feed_icon(i, row) {
+  if (row.ic) return;
+  const [html, ready] = icons.icon_html({ k: 'Item', a: i });
+  row.el.querySelector('.ic').innerHTML = html;
+  row.ic = ready;
+}
+function feed_tick(dt) {
+  for (const [i, row] of FEED) {
+    row.t += dt;
+    if (!row.ic) feed_icon(i, row);
+    if (row.t > FEED_LIFE) row.el.classList.add('out');
+    if (row.t > FEED_LIFE + 0.5) { row.el.remove(); FEED.delete(i); }
   }
 }
 
@@ -625,11 +668,34 @@ function build_map(g, vis) {
   });
   const lines = routes.map(([a, b], k) => `<line data-l="${k}" x1="${pct(a)[0]}" y1="${pct(a)[1]}" x2="${pct(b)[0]}" y2="${pct(b)[1]}"/>`).join('');
   const nodes = vis.map((i, k) => `<button class="mn lb-${side[k]}" type="button" tabindex="-1" data-ci="${k}" style="left:${pct(k)[0]}%;top:${pct(k)[1]}%"><span class="ic"></span><span class="lb"><b>${esc(map.LANDMARKS[i].name)}</b><small></small></span></button>`).join('');
-  el.innerHTML = `<div class="mwrap"><i class="mgrid"></i><svg class="mroutes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${nodes}<span class="mcomp">N</span></div>`;
+  el.innerHTML = `<div class="mwrap"><i class="mgrid"></i><svg class="mroutes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${lines}</svg>${nodes}<span class="mcomp">N</span><div class="mlocal" data-lm></div></div>`;
   HS.map_nodes = [...el.querySelectorAll('.mn')].map((n, k) => ({ n, base: 'mn lb-' + side[k], ic: n.querySelector('.ic'), sub: n.querySelector('small') }));
   HS.map_lines = [...el.querySelectorAll('line')];
   HS.map_routes = routes;
   HS.routes_sig = '';
+  HS.lmap = el.querySelector('[data-lm]');
+  HS.lmap_sig = '';
+}
+
+// Đợt 13: ô "quanh quán" góc dưới bản đồ thế giới: mọi chỗ lục (vàng = còn đồ, xám rỗng = đã lục), người chơi, bãi, quán,
+// mặt đường. Toạ độ SVG = toạ độ thế giới (x đông, z ra đường ở dưới).
+const LMAP = [-42, -22, 92, 81];
+function local_map(g) {
+  const caches = g.props.filter((p) => !p.dead && p.kind.k === 'Cache');
+  const left = caches.filter((p) => p.kind.c === false).length;
+  const r = (b, cl) => `<rect class="${cl}" x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}"/>`;
+  const road = `<rect class="lroad" x="${LMAP[0]}" y="${lay.ROAD_Z0}" width="${LMAP[2]}" height="${lay.ROAD_Z1 - lay.ROAD_Z0}"/>`;
+  const bld = [lay.SHOP, lay.BEDROOM, lay.MEDICAL, lay.EXPANSION, lay.WAREHOUSE].map((b) => r(b, 'lbld')).join('');
+  const dots = caches.map((p) => p.kind.c === false
+    ? `<circle class="lc" cx="${p.pos.x.toFixed(1)}" cy="${p.pos.z.toFixed(1)}" r="1.5"/>`
+    : `<circle class="lc done" cx="${p.pos.x.toFixed(1)}" cy="${p.pos.z.toFixed(1)}" r="1.1"/>`).join('');
+  const a = g.yaw, px = g.player.x, pz = g.player.z;
+  const tri = [[0, -2.6], [1.6, 1.8], [-1.6, 1.8]].map(([x, z]) => {
+    // hướng nhìn: yaw 0 nhìn -z (vào quán)
+    const c = Math.cos(a), sn = Math.sin(a);
+    return `${(px + x * c + z * sn).toFixed(1)},${(pz - x * sn + z * c).toFixed(1)}`;
+  }).join(' ');
+  return `<h4>Around the store <span>${left}/${caches.length} loot spots</span></h4><svg viewBox="${LMAP.join(' ')}" aria-hidden="true">${road}${r(lay.LOT, 'llot')}${bld}${dots}<polygon class="lme" points="${tri}"/></svg>`;
 }
 
 function update_map(g, c) {
@@ -651,6 +717,11 @@ function update_map(g, c) {
     cls(m.n, 'sel', k === c.sel);
     ico(m.ic, card.icon);
     T(m.sub, card.sub);
+  }
+  if (HS.lmap) {
+    let ls = Math.round(g.player.x) + ',' + Math.round(g.player.z) + ',' + Math.round(g.yaw * 8);
+    for (const p of g.props) if (p.kind.k === 'Cache' && !p.dead) ls += p.kind.c ? '1' : '0';
+    if (ls !== HS.lmap_sig) { HS.lmap_sig = ls; HS.lmap.innerHTML = local_map(g); }
   }
   const sig = vis.map((i) => g.lm[i]).join('');
   if (sig !== HS.routes_sig) {
@@ -784,13 +855,18 @@ export function update_hud(g, dt, ctx) {
   if (mouse) ico(R.pmouse, { k: 'Glyph', a: pkey === 'RMB' ? 'MouseR' : 'MouseL' });
   T(R.pkey, pkey);
   const pm = plabel0.match(/^(.*?)\s+(\d+)%$/);
-  const plabel = pm !== null ? pm[1] : plabel0;
+  const prog = pm !== null && free ? Math.min(+pm[2], 100) / 100 : 0;
+  // while a hold runs, "Search duffle bag" reads "Searching duffle bag…" and a bar fills under the prompt
+  let plabel = pm !== null ? pm[1] : plabel0;
+  if (pm !== null && prog > 0 && plabel.startsWith('Search ')) plabel = `Searching ${plabel.slice(7)}…`;
   T(R.plabel, plabel);
   hide(R.ppct, pm === null);
-  const prog = pm !== null && free ? Math.min(+pm[2], 100) / 100 : 0;
   if (pm !== null) T(R.ppct, `${pm[2]}%`);
   cls(R.cross, 'hold', prog > 0);
   sty(R.ringv, 'stroke-dashoffset', (94.25 * (1 - prog)).toFixed(2));
+  hide(R.pbar, !(prog > 0));
+  if (prog > 0) sty(R.pbarv, 'transform', `scaleX(${prog.toFixed(3)})`);
+  feed_tick(dt);
 
   // Thông báo, dòng gợi ý phím.
   on(R.notice, playing && g.notice_t > 0.0);

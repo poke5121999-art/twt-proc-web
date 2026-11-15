@@ -142,7 +142,11 @@ export function prop_box(p) {
     case 'Reward': r = 0.5; h = 0.7; break;
     case 'Wire': r = 0.1; h = 0.1; break;
     case 'Corpse': r = 0.7; h = 0.4; break;
-    case 'Cache': r = 0.45; h = 0.8; break;
+    case 'Cache': {
+      // Đợt 13: đồ cao (tủ, tủ lạnh) nhắm được cả thân.
+      const sz = { 'Locker': [0.6, 1.8], 'Fridge': [0.45, 1.6], 'Cabinet': [0.4, 1.0], 'Tool chest': [0.45, 1.0], 'Supply crate': [0.55, 0.9], 'Safe': [0.35, 0.65] }[p.kind.a];
+      r = sz ? sz[0] : 0.45; h = sz ? sz[1] : 0.8; break;
+    }
     case 'Placed': r = 0.4; h = 1.0; break;
   }
   return [p.pos.add(v3(-r, 0.0, -r)), p.pos.add(v3(r, h, r))];
@@ -324,7 +328,9 @@ export function prompt_for(g, t) {
       let out = '';
       const it0 = g.shelves[s].slots[slot];
       if (it0 !== null) {
-        out = `${items.iname(it0)} - ${g.prices[it0]} Batteries   [Q] Set price   [RMB] Take`;
+        const nu = g.shelves[s].units(slot);
+        const cnt = game.stack_max() > 1 ? ` x${nu}/${game.stack_max()}` : '';
+        out = `${items.iname(it0)}${cnt} - ${g.prices[it0]} Batteries each   [Q] Set price   [RMB] Take`;
       }
       let src = null;
       if (hk !== null && hk.k === 'Box') src = hk.a.length > 0 ? hk.a[hk.a.length - 1] : null;
@@ -471,6 +477,9 @@ export function finish_hold(g, t) {
           if (kd.c !== false) break;
           p.kind = { k: 'Cache', a: kd.a, b: [], c: true };
           p.dirty = true;
+          // Phần nhìn (js/plug/loot.js): nắp mở, từng món bay ra theo cung rồi vào ba lô, mỗi món một dòng "vừa nhặt".
+          if (g.loot_events === undefined) g.loot_events = [];
+          if (g.loot_events.length < 16) g.loot_events.push({ id: p.id, name: kd.a, pos: p.pos.clone(), items: kd.b.slice() });
           const s = items.give(g, kd.b);
           g.caches_done += 1;
           if (g.caches_done >= 3) {
@@ -600,7 +609,8 @@ export function press_e(g, t) {
         g.say(`${items.iname(it)} cannot be sold to customers.`);
         return;
       }
-      const dest = g.shelves[s].slots[slot] === null ? slot : g.shelf_free(s, slot);
+      const n = game.case_units();
+      const dest = g.shelves[s].place_slot(it, slot, n);
       if (dest === null) {
         g.say('This shelf is full.');
         return;
@@ -622,8 +632,8 @@ export function press_e(g, t) {
           }
         }
       }
-      g.shelves[s].slots[dest] = it;
-      g.shelves[s].dirty = true;
+      g.shelves[s].put(dest, it, n);
+      if (n > 1) g.say(`${items.iname(it)} x${g.shelves[s].units(dest)} on the shelf (one case = ${n})`);
       g.complete('Shelve');
       g.play('place', 0.5);
       break;
@@ -1009,6 +1019,8 @@ export function player_system(g, dt_raw, ctx) {
   }
 
   const [target, _hit] = find_target(g, eye, fwd);
+  // Phần nhìn (plug/loot.js) sáng viền chỗ lục đang nhắm.
+  g.look_id = target.k === 'Prop' ? target.a : 0;
   g.prompt = prompt_for(g, target);
   if ((g.prompt.length === 0 || g.prompt === 'Counter') && actors.medical_near(g) !== null) {
     g.prompt = '[Y] Give medicine   [N] Send away';
@@ -1423,11 +1435,16 @@ export function player_system(g, dt_raw, ctx) {
     if (target.k === 'Shelf') {
       const s = target.a, slot = target.b;
       const it = g.shelves[s].slots[slot];
+      const n = game.case_units();
       if (it !== null) {
-        g.shelves[s].slots[slot] = null;
-        g.shelves[s].dirty = true;
-        items.give(g, [it]);
-        g.play('pick', 0.5);
+        // Lấy lại cả thùng (n món lẻ) về ba lô; thùng đã bán dở thì món lẻ còn lại ở yên trên kệ cho khách.
+        if (g.shelves[s].units(slot) >= n) {
+          for (let k = 0; k < n; k++) g.shelves[s].take(slot);
+          items.give(g, [it]);
+          g.play('pick', 0.5);
+        } else {
+          g.say(`Only ${g.shelves[s].units(slot)} loose ${items.iname(it)} left: an opened case stays on the shelf.`);
+        }
       }
     }
   }

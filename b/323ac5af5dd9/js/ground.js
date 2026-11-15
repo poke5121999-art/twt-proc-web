@@ -91,7 +91,8 @@ export function buildGround(G) {
     apron, rain, planar, root, onThunder: null,
     puddleDepth(x, z) { return !inMask(x, z) || inInterior(x, z) ? -0.2 : 0.5 - sampleMask(mask, n, x, z, 0); },
     isPuddle(x, z) { return api.puddleDepth(x, z) > 0.015; },
-    prePass(renderer, camera) { if (apron.mesh.visible) planar.pass(renderer, G.scene, camera); },
+    // no mirror pass from inside the shop: the apron is under the floor there
+    prePass(renderer, camera) { if (apron.mesh.visible && !G.inside) planar.pass(renderer, G.scene, camera); else { apron.uniforms.uReflOn.value = 0; planar.active = false; } },
     update(dt) {
       t += dt;
       const fx = G.ctx.fx, wet = Math.max(fx.wet, fx.rain);

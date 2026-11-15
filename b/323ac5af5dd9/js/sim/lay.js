@@ -206,6 +206,40 @@ export const CACHE_GLOVEBOX = ko(13.2, 13.2);
 export const CACHE_MEDBAG = ko(28.9, 29.4);
 export const CACHE_SUITCASE = ko(-16.4, -18.9);
 
+/** [ĐỀ XUẤT] Chỗ lục thêm (chủ dự án 2026-11-15: "có thể loot được nhiều vị trí hơn, các vị trí có thể loot được cần thể
+ *  hiện rõ ra"). Không có trong bản gốc. Mỗi dòng: [tên hiện trên màn hình, chỗ, hướng (mặt trước +z xoay theo yaw), bảng
+ *  đồ (`game.SPOT_TABLES`), vùng]. Đồ to (tủ, tủ lạnh) dựa lưng vào tường / rào để không ai phải đi xuyên qua. `?stack=1`
+ *  (luật gốc) bỏ cả bảng này. Vùng: yard = trong rào bãi, back = sau quán, street = ngoài rào (vỉa hè, mặt đường). */
+export const LOOT_SPOTS = fz([
+  // bãi trước: dựa vào tường trước phần mở rộng (z 3,2), mặt nhìn ra bãi
+  fz(['Tool chest', v(30.38, 0.0, 22.0), -Math.PI / 2, 'tools', 'yard']),
+  fz(['Locker', v(13.6, 0.0, 3.55), 0.0, 'locker', 'yard']),
+  fz(['Fridge', v(20.0, 0.0, 3.62), 0.0, 'fridge', 'yard']),
+  // bãi tây: tường tây phòng y tế, cạnh skip, rào tây
+  fz(['Cabinet', v(-10.12, 0.0, 2.0), -Math.PI / 2, 'cabinet', 'yard']),
+  fz(['Trash can', v(-10.95, 0.0, 6.3), 0.0, 'bin', 'yard']),
+  fz(['Locker', v(-22.98, 0.0, 2.6), Math.PI / 2, 'locker', 'yard']),
+  fz(['Duffle bag', v(-22.5, 0.0, 29.0), 0.0, 'bag', 'yard']),
+  // bãi giữa: cạnh hai xe hỏng, cổng trước, rào đông
+  fz(['Backpack', v(-13.4, 0.0, 19.2), 0.6, 'backpack', 'yard']),
+  fz(['Ammo case', v(18.8, 0.0, 17.2), -0.4, 'ammo', 'yard']),
+  fz(['Medical bag', v(5.4, 0.0, 38.9), 0.3, 'medical', 'yard']),
+  fz(['Crate', v(30.2, 0.0, 27.0), 0.0, 'crate', 'yard']),
+  fz(['Toolbox', v(25.75, 0.0, -1.0), Math.PI / 2, 'tools', 'yard']),
+  // sau quán: tường tây / đông nhà kho
+  fz(['Safe', v(-5.62, 0.0, -11.0), -Math.PI / 2, 'safe', 'back']),
+  fz(['Supply crate', v(15.75, 0.0, -9.0), Math.PI / 2, 'crate', 'back']),
+  // ngoài rào: vỉa hè gần, mặt đường, vỉa hè bên kia đường (dựa vào dãy nhà)
+  fz(['Backpack', v(21.5, 0.0, 42.6), -0.8, 'backpack', 'street']),
+  fz(['Duffle bag', v(-38.0, 0.0, 44.4), 0.4, 'bag', 'street']),
+  fz(['Suitcase', v(46.0, 0.0, 50.6), 0.9, 'bag', 'street']),
+  fz(['Fridge', v(-10.5, 0.0, 57.25), Math.PI, 'fridge', 'street']),
+  fz(['Tool chest', v(-3.0, 0.0, 57.3), Math.PI, 'tools', 'street']),
+  fz(['Locker', v(29.3, 0.0, 57.3), Math.PI, 'locker', 'street']),
+  fz(['Trash can', v(-30.5, 0.0, 57.45), 0.0, 'bin', 'street']),
+  fz(['Cabinet', v(8.0, 0.0, 57.4), Math.PI, 'cabinet', 'street']),
+]);
+
 /** Xe hỏng: (chỗ, hướng, màu, lật). Ba chiếc trong bãi theo xe hỏng của bản gốc, hai chiếc trên đường. */
 export const CARS = fz([
   fz([ko(14.8, 14.6), 0.5, 0x6d7f8f, false]),
@@ -496,6 +530,7 @@ export function json() {
   s.push(`"customer_spawns":[${list(CUSTOMER_SPAWNS)}],`);
   s.push(`"zombie_spawns":[${list(ZOMBIE_SPAWNS)}],`);
   s.push(`"shelf_stands":[${list(SHELF_STANDS)}],`);
+  s.push(`"loot_spots":[${LOOT_SPOTS.map(([n, p, yaw, t, zone]) => `{"n":"${n}","p":[${rfix(p.x, 3)},0,${rfix(p.z, 3)}],"yaw":${rfix(yaw, 3)},"t":"${t}","zone":"${zone}"}`).join(',')}],`);
   const sh = SHELVES.map(([x, sx, f]) => `[${rfix(x, 3)},${rfix(sx, 3)},${rfix(f, 1)}]`);
   s.push(`"shelves":[${sh.join(',')}],`);
   s.push(`"shelf_z0":${rfix(SHELF_Z0, 3)},"slot_w":${rfix(SLOT_W, 3)},"counter_split_z":${rfix(COUNTER_SPLIT_Z, 3)},"counter_side_x":${rfix(COUNTER_SIDE_X, 3)},"counter_front_z":${rfix(COUNTER_FRONT_Z, 3)},"counter_back_z":${rfix(COUNTER_BACK_Z, 3)},"bed_side":${rfix(signum(BED_DOOR.x), 1)},"street_dz":${rfix(STREET_DZ, 1)}`);

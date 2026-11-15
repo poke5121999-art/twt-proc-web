@@ -118,7 +118,7 @@ export function export_system(g, dt, ctx) {
     g.speed = Math.min(Math.max(Math.fround(sp), 0.1), 60.0);
   }
   const todo = g.todo().map((t) => `"${esc(t[1])}"`);
-  const props = g.props.filter((p) => !p.dead).map((p) => `{"id":${p.id},"k":"${kind_tag(p.kind)}","x":${rfix(p.pos.x, 2)},"z":${rfix(p.pos.z, 2)}}`);
+  const props = g.props.filter((p) => !p.dead).map((p) => `{"id":${p.id},"k":"${kind_tag(p.kind)}","x":${rfix(p.pos.x, 2)},"z":${rfix(p.pos.z, 2)}${p.kind.k === 'Cache' ? `,"n":"${esc(p.kind.a)}","c":${(p.kind.b || []).length}` : ''}}`);
   const zs = g.zombies.filter((z) => !z.dead).map((z) => {
     let kd;
     switch (z.kind) {
@@ -139,7 +139,11 @@ export function export_system(g, dt, ctx) {
     if (hp !== undefined) held = kind_tag(hp.kind);
   }
   let shelf = 0;
-  for (const s of g.shelves) shelf += s.slots.filter((x) => x !== null).length;
+  let shelf_slots = 0;
+  for (const s of g.shelves) {
+    shelf += s.total();
+    shelf_slots += s.slots.filter((x) => x !== null).length;
+  }
   const done = Array.from(g.done, (d) => (d ? '1' : '0'));
   // `inv`: 14 món của các bản trước theo thứ tự cũ (bot cũ đọc theo chỉ số); `bag`: mọi món đang có theo tên.
   const inv = catalog.BRIDGE.map((i) => String(g.inv[i]));
@@ -155,12 +159,12 @@ export function export_system(g, dt, ctx) {
     }
     saves = out.join(',');
   }
-  const extra = `"bag":{${bag.join(',')}},"bagRows":[${bag_rows}],"sk":${skills.export(g)},"bld":${build.export(g)},"cb":${combat.export(g)},"ev":${events.export(g)},"slot":${g.slot},"bagSel":${g.bag_sel},"hpMax":${rfix(g.hp_max, 0)},"xp":[${g.xpv[0]},${g.xpv[1]},${g.xpv[2]},${g.xpv[3]}],"staffSel":${g.staff_sel},"stockSel":"${esc(items.iname(g.stock_sel))}","saves":[${saves}]`;
+  const extra = `"bag":{${bag.join(',')}},"bagRows":[${bag_rows}],"sk":${skills.export(g)},"bld":${build.export(g)},"cb":${combat.export(g)},"ev":${events.export(g)},"slot":${g.slot},"bagSel":${g.bag_sel},"hpMax":${rfix(g.hp_max, 0)},"xp":[${g.xpv[0]},${g.xpv[1]},${g.xpv[2]},${g.xpv[3]}],"staffSel":${g.staff_sel},"stockSel":"${esc(items.iname(g.stock_sel))}","saves":[${saves}],"sales":[${(g.sales || []).join(',')}]`;
   const pay = g.pay !== null ? g.pay.coins.map((c) => `[${c.value},${c.checked ? 1 : 0},${c.checked && c.fake ? 1 : 0},${c.done}]`).join(',') : '';
   const pay_alarm = g.pay !== null ? g.pay.alarm : -1;
   const med = g.customers.filter((c) => c.goal.k === 'Medical' && !c.gone).length;
   const elapsed = ctx.elapsed !== undefined && ctx.elapsed !== null ? ctx.elapsed : ex.elapsed;
-  let json = `{"mode":"${g.mode}","panel":"${panel_debug(g.panel)}","day":${g.day},"min":${rfix(g.minutes, 1)},"bat":${g.batteries},"rep":${rfix(g.rep, 3)},"open":${g.open},"hp":${rfix(g.hp, 1)},"pos":[${rfix(g.player.x, 3)},${rfix(g.player.y, 3)},${rfix(g.player.z, 3)}],"yaw":${rfix(g.yaw, 4)},"pitch":${rfix(g.pitch, 4)},"prompt":"${esc(g.prompt)}","notice":"${esc(g.notice_t > 0.0 ? g.notice : '')}","todo":[${todo.join(',')}],"props":[${props.join(',')}],"zs":[${zs.join(',')}],"cs":[${cs.join(',')}],"head":${rfix(head, 2)},"held":"${held}","armed":${g.armed},"shelf":${shelf},"done":[${done.join(',')}],"inv":[${inv.join(',')}],"door":{"open":${g.door.open},"hp":${rfix(g.door.hp, 0)}},"raid":{"active":${g.raid.active},"wave":${g.raid.wave},"next":${g.raid.next_day}},"served":${g.total_served},"bedDoor":${g.bed_door_hits},"trash":${g.trash_done},"sweep":${g.sweep_done},"q":${ctx.quality.tier},"fps":${rfix(fps, 0)},"frames":${ex.frames},"sfx":${ex.sfx},"lastSfx":"${ex.last_sfx}","cine":${g.cine !== null ? g.cine[0] : -1},"ff":${g.ff},"pay":[${pay}],"payAlarm":${pay_alarm},"med":[${med},${actors.medical_near(g) !== null ? 1 : 0}],"gifts":${g.med_gifts.length},"staff":[${staff.export(g)}],"lm":[${Array.from(g.lm, (v) => String(v)).join(',')}],"lmhp":[${Array.from(g.lm_hp, (v) => rfix(v, 0)).join(',')}],"lmSel":${g.lm_sel},"craft":${craft.export(g)},${extra},"toast":"${g.toast_t > 0.0 ? g.toast : ''}","t":${rfix(elapsed, 1)}}`;
+  let json = `{"mode":"${g.mode}","panel":"${panel_debug(g.panel)}","day":${g.day},"min":${rfix(g.minutes, 1)},"bat":${g.batteries},"rep":${rfix(g.rep, 3)},"open":${g.open},"hp":${rfix(g.hp, 1)},"pos":[${rfix(g.player.x, 3)},${rfix(g.player.y, 3)},${rfix(g.player.z, 3)}],"yaw":${rfix(g.yaw, 4)},"pitch":${rfix(g.pitch, 4)},"prompt":"${esc(g.prompt)}","notice":"${esc(g.notice_t > 0.0 ? g.notice : '')}","todo":[${todo.join(',')}],"props":[${props.join(',')}],"zs":[${zs.join(',')}],"cs":[${cs.join(',')}],"head":${rfix(head, 2)},"held":"${held}","armed":${g.armed},"shelf":${shelf},"shelfSlots":${shelf_slots},"stack":[${game.case_units()},${game.stack_max()}],"done":[${done.join(',')}],"inv":[${inv.join(',')}],"door":{"open":${g.door.open},"hp":${rfix(g.door.hp, 0)}},"raid":{"active":${g.raid.active},"wave":${g.raid.wave},"next":${g.raid.next_day}},"served":${g.total_served},"bedDoor":${g.bed_door_hits},"trash":${g.trash_done},"sweep":${g.sweep_done},"q":${ctx.quality.tier},"fps":${rfix(fps, 0)},"frames":${ex.frames},"sfx":${ex.sfx},"lastSfx":"${ex.last_sfx}","cine":${g.cine !== null ? g.cine[0] : -1},"ff":${g.ff},"pay":[${pay}],"payAlarm":${pay_alarm},"med":[${med},${actors.medical_near(g) !== null ? 1 : 0}],"gifts":${g.med_gifts.length},"staff":[${staff.export(g)}],"lm":[${Array.from(g.lm, (v) => String(v)).join(',')}],"lmhp":[${Array.from(g.lm_hp, (v) => rfix(v, 0)).join(',')}],"lmSel":${g.lm_sel},"craft":${craft.export(g)},${extra},"toast":"${g.toast_t > 0.0 ? g.toast : ''}","t":${rfix(elapsed, 1)}}`;
   // Số biểu tượng món đã vẽ / tổng số (bot chờ vẽ xong rồi mới chụp).
   const im = scene.impl();
   const zoo = g.zoo ? (im && im.people && typeof im.people.zoo_info === 'function' ? im.people.zoo_info() : '') : '';

@@ -266,7 +266,7 @@ vec2 gRipple(vec2 p, float t, float cell, float seed){
   alb += vec3(0.11, 0.105, 0.095) * smoothstep(0.58, 0.78, d2.a) * (1.0 - conc * 0.6);    // pale aggregate
   float polish = smoothstep(0.38, 0.72, mk.a);                                            // traffic-polished lanes
   alb *= mix(1.0, 0.78, polish);
-  alb = mix(alb, vec3(0.018, 0.018, 0.02), max(max(tar, seal * 0.4) * 0.94, crack * 0.9));
+  alb = mix(alb, vec3(0.018, 0.018, 0.02), max(max(tar, seal * 0.4) * 0.94, crack * mix(0.5, 0.9, conc)));
   alb *= 1.0 - 0.62 * mk.b;                                                               // oil
   // ---- painted markings (worn, chipped) + tyre rubber ----
   vec2 kuv = (gxz - uMarkRect.xy) * uMarkRect.zw;

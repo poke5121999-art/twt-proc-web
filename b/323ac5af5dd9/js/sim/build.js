@@ -287,8 +287,10 @@ export function pick_up(g, id) {
   const k = g.shelves.findIndex((s) => s.prop === id);
   if (k !== -1) {
     const sh = g.shelves.splice(k, 1)[0];
-    for (const it of sh.slots) {
-      if (it !== null) g.inv[it] += 1;
+    // Món lẻ về lại ba lô thành thùng: đủ `case_units()` món lẻ cùng loại là một món (thùng bán dở thì làm tròn lên).
+    for (let s = 0; s < sh.slots.length; s++) {
+      const it = sh.slots[s];
+      if (it !== null) g.inv[it] += Math.ceil(sh.units(s) / game.case_units());
     }
     g.bld.dirty = true;
     // Hình kệ cũ được xoá ở world::sync_world qua danh sách kệ mồ côi.
@@ -722,7 +724,10 @@ export function tick_helper(g, dt) {
       }
     } else if (h.pause <= 0.0) {
       // Ra khỏi phòng y tế qua cửa rồi mới đi tuần ngoài bãi.
-      const via = lay.inside(lay.MEDICAL_IN, h.pos) ? lay.MED_B.add(v3(1.2, 0.0, 0.0)) : game.Game.in_shop(h.pos) && h.pos.distance(lay.DOOR_IN) > 0.6 && h.pos.z < lay.DOOR_IN.z ? lay.DOOR_IN : game.Game.in_shop(h.pos) ? lay.DOOR_OUT : to;
+      // [SỬA KHI CHUYỂN NGỮ] Trong bề dày tường (x -5,25..-5,0) Stompy không thuộc phòng y tế lẫn quán nên quay lại đích ngoài bãi,
+      // rồi lại vào phòng: đứng giật tại ngưỡng cửa mãi (đo bằng tools/t-helper.mjs). Coi ngưỡng cửa là còn trong phòng y tế.
+      const in_med_door = h.pos.x >= lay.MED_DOOR_BOX[0] - 0.05 && h.pos.x <= lay.MED_DOOR_BOX[2] + 0.05 && h.pos.z > lay.MED_DOOR_BOX[1] && h.pos.z < lay.MED_DOOR_BOX[3];
+      const via = lay.inside(lay.MEDICAL_IN, h.pos) || in_med_door ? lay.MED_B.add(v3(1.2, 0.0, 0.0)) : game.Game.in_shop(h.pos) && h.pos.distance(lay.DOOR_IN) > 0.6 && h.pos.z < lay.DOOR_IN.z ? lay.DOOR_IN : game.Game.in_shop(h.pos) ? lay.DOOR_OUT : to;
       go(h, via, 2.2, g);
       // Tới cửa chính mà cửa đang đóng (đêm, quán đã đóng) thì tự đẩy cửa ra, không thì kẹt trong quán cả đêm.
       if (game.Game.in_shop(h.pos) && h.pos.distance(lay.DOOR_IN) < 1.6 && !g.door.open && g.door.hp > 0.0) {
@@ -993,7 +998,8 @@ export function save(g) {
     const [it, hp, aux] = rec;
     const sh = g.shelves.find((s) => s.prop === p.id && s.prop !== 0);
     const slots = sh !== undefined ? sh.slots.map((x) => String(x !== null ? x : -1)).join('.') : '';
-    placed.push(`${it},${trunc(p.pos.x * 100.0)},${trunc(p.pos.z * 100.0)},${trunc(p.yaw * 100.0)},${trunc(hp)},${trunc(aux)},${slots}`);
+    const counts = sh !== undefined ? sh.counts.map((x) => String(x | 0)).join('.') : '';
+    placed.push(`${it},${trunc(p.pos.x * 100.0)},${trunc(p.pos.z * 100.0)},${trunc(p.yaw * 100.0)},${trunc(hp)},${trunc(aux)},${slots},${counts}`);
   }
   return `${head}|${placed.join('/')}`;
 }
@@ -1048,7 +1054,13 @@ export function load(g, s) {
         const v = parse_i32(vs);
         if (v !== null && k < sh.slots.length) {
           sh.slots[k] = v >= 0 && v < catalog.N_CAT ? v : null;
+          sh.counts[k] = sh.slots[k] === null ? 0 : 1;
         }
+      });
+      // Bản lưu cũ không có trường số món lẻ: mỗi ô 1 món.
+      (f.length > 7 ? f[7] : '').split('.').forEach((vs, k) => {
+        const v = parse_i32(vs);
+        if (v !== null && k < sh.slots.length && sh.slots[k] !== null) sh.counts[k] = Math.max(1, v);
       });
       g.shelves.push(sh);
     }
