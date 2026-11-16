@@ -133,6 +133,15 @@ export const SHELVES = fz([fz([-4.55, -3.7, 1.0]), fz([4.55, 3.7, -1.0])]);
 /** z của mép đầu kệ và bề rộng một ô. */
 export const SHELF_Z0 = -1.6;
 export const SLOT_W = 0.6;
+/** [phiên 7, chủ dự án: "lúc mới vào quán chỉ có MỘT kệ"] Kệ ván bắt tường (Flimsy Wooden Shelf của bản gốc): một tấm ván ngang
+ *  ngực, 7 ô ngang x 3 ô sâu trên cùng tấm ván (tầng của luật = hàng từ trước ra sau). Mặt ván ở y PLANK_TOP; tâm hàng l ở
+ *  z riêng của kệ PLANK_ROWS[l] (+z là mặt trước); mép trước PLANK_FRONT. */
+export const PLANK_TOP = 1.0;
+export const PLANK_ROWS = [0.19, 0.0, -0.19];
+export const PLANK_FRONT = 0.31;
+/** Độ dày tấm ván (gốc là ván mỏng 2-3 cm) và tâm hàng thẻ giá treo dưới mép trước (một thẻ mỗi cột). */
+export const PLANK_T = 0.025;
+export const PLANK_TAG_Y = PLANK_TOP - PLANK_T - 0.041;
 /** Bot đứng trước kệ (mỗi kệ một chỗ). */
 export const SHELF_STANDS = fz([v(-3.3, 0.0, 0.4), v(3.3, 0.0, 0.4)]);
 /** Mép quầy bot vòng qua (x hai đầu quầy, z trước quầy, z sau quầy). */
@@ -160,7 +169,7 @@ export const WAKE_YAW = -f32(Math.PI / 2);
 export const WAKE_DROP = v(-6.4, 0.0, -3.8);
 /** Hộp các-tông trong phòng ngủ (gốc `CardboardBoxItemPrefab` (-9,4; -6,1)). */
 export const CARD_BOX = v(-8.3, 0.0, -3.1);
-export const BOX_PILE = v(-6.75, 0.0, -3.6);
+export const BOX_PILE = v(-1.75, 0.0, 4.45);
 /** Góc đống 14 hộp thiếc; hàng xếp về phía -x (`TINS_STEP`), dãy lùi về +z. */
 export const TINS = v(-6.0, 0.0, -2.0);
 export const TINS_STEP = -0.42;
@@ -535,6 +544,7 @@ export function json() {
   s.push(`"loot_spots":[${LOOT_SPOTS.map(([n, p, yaw, t, zone]) => `{"n":"${n}","p":[${rfix(p.x, 3)},0,${rfix(p.z, 3)}],"yaw":${rfix(yaw, 3)},"t":"${t}","zone":"${zone}"}`).join(',')}],`);
   const sh = SHELVES.map(([x, sx, f]) => `[${rfix(x, 3)},${rfix(sx, 3)},${rfix(f, 1)}]`);
   s.push(`"shelves":[${sh.join(',')}],`);
+  s.push(`"plank_top":${rfix(PLANK_TOP, 3)},"plank_rows":[${PLANK_ROWS.map((r) => rfix(r, 3)).join(',')}],"plank_front":${rfix(PLANK_FRONT, 3)},"plank_tag_y":${rfix(PLANK_TAG_Y, 3)},`);
   s.push(`"shelf_z0":${rfix(SHELF_Z0, 3)},"slot_w":${rfix(SLOT_W, 3)},"counter_split_z":${rfix(COUNTER_SPLIT_Z, 3)},"counter_side_x":${rfix(COUNTER_SIDE_X, 3)},"counter_front_z":${rfix(COUNTER_FRONT_Z, 3)},"counter_back_z":${rfix(COUNTER_BACK_Z, 3)},"bed_side":${rfix(signum(BED_DOOR.x), 1)},"street_dz":${rfix(STREET_DZ, 1)}`);
   s.push('}');
   return s.join('');

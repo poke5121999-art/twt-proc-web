@@ -60,6 +60,8 @@ export const Target = {
   BedDoor: () => ({ k: 'BedDoor' }),
   Radio: () => ({ k: 'Radio' }),
   Shelf: (s, slot) => ({ k: 'Shelf', a: s, b: slot }),
+  /** [phiên 7] Thẻ giá trên mép trước ô kệ (plug/pricetag.js vẽ): [E] đặt giá. */
+  Tag: (s, slot) => ({ k: 'Tag', a: s, b: slot }),
   Prop: (id) => ({ k: 'Prop', a: id }),
   /** Trạm trong thế giới (mã ở build.rs). */
   Station: (st) => ({ k: 'Station', a: st }),
@@ -197,6 +199,12 @@ export function find_target(g, o, d) {
     const sn = Math.sin(sh.yaw), cs = Math.cos(sh.yaw);
     const ex = Math.abs(cs) * hl + Math.abs(sn) * 0.32, ez = Math.abs(sn) * hl + Math.abs(cs) * 0.32;
     const top = 0.5 + trunc(sh.slots.length / sh.cols) * 0.5;
+    if (sh.plank) {
+      // kệ ván: hộp từ dưới ván tới trên hàng hoá, sâu từ tường tới mép trước
+      const ex2 = Math.abs(cs) * hl + Math.abs(sn) * 0.4, ez2 = Math.abs(sn) * hl + Math.abs(cs) * 0.4;
+      test(Target.Shelf(s, 0), v(sh.pos.x - ex2, lay.PLANK_TOP - 0.25, sh.pos.z - ez2), v(sh.pos.x + ex2, lay.PLANK_TOP + 0.3, sh.pos.z + ez2));
+      return;
+    }
     test(Target.Shelf(s, 0), v(sh.pos.x - ex, 0.3, sh.pos.z - ez), v(sh.pos.x + ex, top, sh.pos.z + ez));
   });
   const hc = actors.head_customer(g);
@@ -231,13 +239,51 @@ export function find_target(g, o, d) {
   if (best[0].k === 'Shelf') {
     const s = best[0].a;
     const sh = g.shelves[s];
-    const local = rot_neg_y(sh.yaw, best[2].sub(sh.pos));
-    const col = clamp(trunc(Math.floor(local.x / lay.SLOT_W + sh.cols * 0.5)), 0, sh.cols - 1);
+    let local = rot_neg_y(sh.yaw, best[2].sub(sh.pos));
     const levels = trunc(sh.slots.length / sh.cols);
-    const lvl = clamp(trunc(Math.floor((best[2].y - 0.45) / 0.5)), 0, levels - 1);
+    let lvl;
+    if (sh.plank) {
+      // ô = chỗ tia nhắm cắt mặt ván (hàng hoá đứng trên ván): cột theo x, hàng theo độ sâu
+      const yb = lay.PLANK_TOP + 0.04;
+      if (d.y < -1e-4 && o.y > yb) local = rot_neg_y(sh.yaw, o.add(d.mul((yb - o.y) / d.y)).sub(sh.pos));
+      lvl = clamp(Math.round((lay.PLANK_ROWS[0] - local.z) / (lay.PLANK_ROWS[0] - lay.PLANK_ROWS[1])), 0, levels - 1);
+    } else lvl = clamp(trunc(Math.floor((best[2].y - 0.45) / 0.5)), 0, levels - 1);
+    const col = clamp(trunc(Math.floor(local.x / lay.SLOT_W + sh.cols * 0.5)), 0, sh.cols - 1);
     best[0] = Target.Shelf(s, lvl * sh.cols + col);
+    // Thẻ giá trên mép trước các ô có hàng: nhắm trúng thẻ thì đích là thẻ (kể cả khi hộp kệ, nhô ra trước thẻ, bị trúng trước).
+    const lo = rot_neg_y(sh.yaw, o.sub(sh.pos)), ld = rot_neg_y(sh.yaw, d);
+    let bt = null, bd = Math.min(REACH, best[1] + 0.25);
+    for (let k = 0; k < sh.slots.length; k++) {
+      if (sh.slots[k] === null) continue;
+      if (sh.plank && plank_tag_slot(sh, k % sh.cols) !== k) continue;
+      const [mn, mx] = tag_box(sh, k);
+      const dist = ray_box(lo, ld, mn, mx);
+      if (dist !== null && dist < bd) { bd = dist; bt = k; }
+    }
+    if (bt !== null) best = [Target.Tag(s, bt), bd, o.add(d.mul(bd))];
   }
   return [best[0], best[2]];
+}
+/** Tâm thẻ giá của kệ ván (y): một hàng thẻ treo dưới mép trước tấm ván. */
+export function tag_y() {
+  return lay.PLANK_TAG_Y;
+}
+/** Kệ ván: mỗi cột một thẻ, của món đứng trước nhất trong cột (ô hàng trước nếu có hàng, không thì hàng sau đó); null khi cột trống. */
+export function plank_tag_slot(sh, col) {
+  const levels = trunc(sh.slots.length / sh.cols);
+  for (let l = 0; l < levels; l++) if (sh.slots[l * sh.cols + col] !== null) return l * sh.cols + col;
+  return null;
+}
+/** Hộp nhắm của thẻ giá ô `k` trong khung riêng của kệ (+z mặt trước; mép trước tầng l ở y 0,435..0,485 + 0,5 l, z 0,25). */
+export function tag_box(sh, k) {
+  const col = k % sh.cols, lvl = trunc(k / sh.cols);
+  if (sh.plank) {
+    // kệ ván: một thẻ mỗi cột treo dưới mép trước (hơi ngả ra sau cho dễ đọc từ chỗ đứng)
+    const x = (col + 0.5 - sh.cols * 0.5) * lay.SLOT_W, y = tag_y();
+    return [v3(x - 0.13, y - 0.04, lay.PLANK_FRONT - 0.02), v3(x + 0.13, y + 0.04, lay.PLANK_FRONT + 0.035)];
+  }
+  const x = (col + 0.5 - sh.cols * 0.5) * lay.SLOT_W, y = 0.41 + lvl * 0.5;
+  return [v3(x - 0.14, y - 0.055, 0.2), v3(x + 0.14, y + 0.055, 0.3)];
 }
 /** Quat::from_rotation_y(-yaw) * v */
 function rot_neg_y(yaw, p) {
@@ -254,6 +300,37 @@ export function held_kind(g) {
   if (g.held === null) return null;
   const p = g.props.find((p) => p.id === g.held);
   return p === undefined ? null : clone_kind(p.kind);
+}
+
+/** Món trên cùng của hộp đem bày được (bỏ qua vật liệu không bán), không có thì món trên cùng. */
+function box_top(a) {
+  for (let i = a.length - 1; i >= 0; i--) if (items.sellable(a[i]) && !items.is_material(a[i])) return a[i];
+  for (let i = a.length - 1; i >= 0; i--) if (items.sellable(a[i])) return a[i];
+  return a.length > 0 ? a[a.length - 1] : null;
+}
+/** [phiên 7] Mang hộp / món trên tay vào quán (hoặc phòng ngủ): vật liệu không bày bán được cất vào kho (ba lô = kho của
+ *  quán, dùng để chế tạo / dựng), hàng bán được ở lại trong hộp để xếp kệ. */
+export function stow_materials(g) {
+  if (g.held === null || game.loot_bag()) return;
+  if (!(game.Game.in_shop(g.player) || game.Game.in_bedroom(g.player))) return;
+  const p = g.prop(g.held);
+  if (p === null) return;
+  if (p.kind.k === 'Box') {
+    const mats = p.kind.a.filter((it) => items.is_material(it) || !items.sellable(it));
+    if (mats.length === 0) return;
+    p.kind.a = p.kind.a.filter((it) => !(items.is_material(it) || !items.sellable(it)));
+    p.dirty = true;
+    items.give(g, mats);
+    g.say(`Stored in the stockroom: ${loot_text(mats)}`);
+    g.play('place', 0.4);
+  } else if (p.kind.k === 'Item' && (items.is_material(p.kind.a) || !items.sellable(p.kind.a))) {
+    const it = p.kind.a;
+    p.dead = true;
+    g.held = null;
+    items.give(g, [it]);
+    g.say(`Stored in the stockroom: 1x ${items.iname(it)}`);
+    g.play('place', 0.4);
+  }
 }
 
 /** Sức chứa hộp các-tông: 8 món x hệ số nút kỹ năng. */
@@ -324,6 +401,11 @@ export function prompt_for(g, t) {
     case 'BedDoor': return g.has_hammer() ? 'Jammed door - hit it with the hammer [LMB]' : 'Jammed door - find a hammer';
     case 'Radio': return '[E] Radio';
     case 'Station': return build.prompt(g, t.a);
+    case 'Tag': {
+      const it = g.shelves[t.a].slots[t.b];
+      if (it === null) return '';
+      return `[E] Set price   ${items.iname(it)}: ${g.prices[it]} Batteries each (worth ${Math.max(items.ival(it), 1)})`;
+    }
     case 'Shelf': {
       const s = t.a, slot = t.b;
       let out = '';
@@ -331,10 +413,11 @@ export function prompt_for(g, t) {
       if (it0 !== null) {
         const nu = g.shelves[s].units(slot);
         const cnt = game.stack_max() > 1 ? ` x${nu}/${game.stack_max()}` : '';
-        out = `${items.iname(it0)}${cnt} - ${g.prices[it0]} Batteries each   [Q] Set price   [RMB] Take`;
+        out = `${items.iname(it0)}${cnt} - ${g.prices[it0]} Batteries each   [E on price tag] or [Q] Set price   [RMB] Take`;
       }
       let src = null;
-      if (hk !== null && hk.k === 'Box') src = hk.a.length > 0 ? hk.a[hk.a.length - 1] : null;
+      if (hk !== null && hk.k === 'Box') src = box_top(hk.a);
+      else if (hk !== null && hk.k === 'Item') src = hk.a;
       else if (hk === null && g.inv[g.stock_sel] > 0 && items.sellable(g.stock_sel)) src = g.stock_sel;
       if (src !== null) {
         if (out.length !== 0) {
@@ -358,9 +441,19 @@ export function prompt_for(g, t) {
         case 'Trash': return '[E] Pick up trash';
         case 'Pile': return '[hold E] Sweep';
         case 'Item':
-          if (hk !== null && hk.k === 'Box') return `[E] Put ${items.iname(kd.a)} in box`;
+          if (hk !== null && hk.k === 'Box') {
+            const cap = box_cap(g);
+            if (hk.a.length >= cap) return `${items.iname(kd.a)} - Box full (${hk.a.length}/${cap})`;
+            return `[E] Put ${items.iname(kd.a)} in box (${hk.a.length}/${cap})`;
+          }
+          if (items.box_only(kd.a)) {
+            if (hk !== null) return `${items.iname(kd.a)} - Need a box to carry more`;
+            return `[E] Take ${items.iname(kd.a)} (one in hand - need a box to carry more)`;
+          }
           return `[E] Take ${items.iname(kd.a)}`;
-        case 'Box': return `[E] Pick up cardboard box (${kd.a.length}/${box_cap(g)})`;
+        case 'Box':
+          if (hk !== null && hk.k === 'Item') return `[E] Put ${items.iname(hk.a)} in this box (${kd.a.length}/${box_cap(g)})`;
+          return `[E] Pick up cardboard box (${kd.a.length}/${box_cap(g)})`;
         case 'BoxPile': return '[E] Take an empty cardboard box';
         case 'Hammer': return '[E] Equip hammer';
         case 'Crate': return '[hold E] Open package';
@@ -468,7 +561,11 @@ export function finish_hold(g, t) {
         case 'Crate':
         case 'Reward': {
           p.dead = true;
-          const s = items.give(g, kd.a);
+          // [phiên 7] hàng / vật liệu trong thùng giao bung ra đất quanh thùng (nhặt bằng hộp), thứ khác vào ba lô
+          const goods = kd.a.filter((it) => items.box_only(it)), rest = kd.a.filter((it) => !items.box_only(it));
+          if (goods.length) drop_loot(g, p.id, p.pos, goods, kd.k === 'Crate' ? 'Package' : 'Supply drop');
+          if (rest.length) items.give(g, rest);
+          const s = loot_text(kd.a);
           g.complete('OpenPackage');
           g.play('loot', 0.7);
           g.say(`Received: ${s}`);
@@ -617,6 +714,15 @@ export function alarm(g) {
 export function press_e(g, t) {
   const hk = held_kind(g);
   switch (t.k) {
+    case 'Tag': {
+      const it = g.shelves[t.a].slots[t.b];
+      if (it !== null) {
+        g.panel = { k: 'Price', a: it };
+        g.price_slot = [t.a, t.b];
+        g.play('click', 0.4);
+      }
+      break;
+    }
     case 'Switch': g.toggle_open(); break;
     case 'Bed':
       if (g.can_sleep()) {
@@ -658,7 +764,8 @@ export function press_e(g, t) {
     case 'Shelf': {
       const s = t.a, slot = t.b;
       let src = null;
-      if (hk !== null && hk.k === 'Box') src = hk.a.length > 0 ? hk.a[hk.a.length - 1] : null;
+      if (hk !== null && hk.k === 'Box') src = box_top(hk.a);
+      else if (hk !== null && hk.k === 'Item') src = hk.a;
       else if (hk === null && g.inv[g.stock_sel] > 0 && items.sellable(g.stock_sel)) src = g.stock_sel;
       const it = src;
       if (it === null) {
@@ -675,11 +782,16 @@ export function press_e(g, t) {
         g.say('This shelf is full.');
         return;
       }
-      if (g.held !== null && hk !== null && hk.k === 'Box') {
+      if (g.held !== null && hk !== null && hk.k === 'Item') {
+        const p = g.prop(g.held);
+        if (p !== null) p.dead = true;
+        g.held = null;
+      } else if (g.held !== null && hk !== null && hk.k === 'Box') {
         const p = g.prop(g.held);
         if (p !== null) {
           if (p.kind.k === 'Box') {
-            p.kind.a.pop();
+            const bi = p.kind.a.lastIndexOf(it);
+            if (bi >= 0) p.kind.a.splice(bi, 1);
           }
           p.dirty = true;
         }
@@ -724,6 +836,17 @@ export function press_e(g, t) {
         g.cb.throw_item = null;
         g.play('pick', 0.6);
         g.complete('PickBox');
+      } else if (kd.k === 'Box' && hk !== null && hk.k === 'Item') {
+        if (kd.a.length >= cap) {
+          g.say(`Box full (${kd.a.length}/${cap}).`);
+          return;
+        }
+        const ip = g.prop(g.held);
+        if (ip !== null) ip.dead = true;
+        g.held = null;
+        p.kind.a.push(hk.a);
+        p.dirty = true;
+        g.play('pick', 0.5);
       } else if (kd.k === 'Trash' || kd.k === 'Box' || (kd.k === 'Corpse' && kd.b === true)) {
         const is_box = p.kind.k === 'Box';
         const p_kind = clone_kind(p.kind);
@@ -743,23 +866,30 @@ export function press_e(g, t) {
         }
       } else if (kd.k === 'Item') {
         const it = kd.a;
-        p.dead = true;
-        let boxed = false;
-        if (g.held !== null) {
-          const bx = g.prop(g.held);
-          if (bx !== null) {
-            if (bx.kind.k === 'Box') {
-              if (bx.kind.a.length < cap) {
-                bx.kind.a.push(it);
-                bx.dirty = true;
-                boxed = true;
-              }
-            }
+        const bx = g.held !== null ? g.prop(g.held) : null;
+        if (bx !== null && bx.kind.k === 'Box') {
+          if (bx.kind.a.length >= cap) {
+            g.say(`Box full (${bx.kind.a.length}/${cap}). Stock a shelf, or [X] drop it and take another box.`);
+            g.play('deny', 0.4);
+            return;
           }
-        }
-        if (boxed) {
+          p.dead = true;
+          bx.kind.a.push(it);
+          bx.dirty = true;
           g.complete('FillBox');
+        } else if (items.box_only(it)) {
+          if (g.held !== null) {
+            g.say('Hands full. Need a box to carry more: take one from the cardboard box pile.');
+            g.play('deny', 0.4);
+            return;
+          }
+          // một món trên tay như hộp nhỏ: chặn vũ khí, [E] lên kệ / vào hộp, [X] thả
+          g.held = id;
+          g.armed = false;
+          g.cb.throw_item = null;
+          g.say(`Carrying ${items.iname(it)} by hand. Need a box to carry more. [E] a shelf to stock it, [X] drop.`);
         } else {
+          p.dead = true;
           items.give(g, [it]);
           g.say(`Took ${items.iname(it)}.`);
         }
@@ -1097,9 +1227,11 @@ export function player_system(g, dt_raw, ctx) {
     return;
   }
 
+  stow_materials(g);
   const [target, _hit] = find_target(g, eye, fwd);
   // Phần nhìn (plug/loot.js) sáng viền chỗ lục đang nhắm.
   g.look_id = target.k === 'Prop' ? target.a : 0;
+  g.look_tag = target.k === 'Tag' ? [target.a, target.b] : null; // phần nhìn (plug/pricetag.js) sáng viền thẻ đang nhắm
   g.prompt = prompt_for(g, target);
   if ((g.prompt.length === 0 || g.prompt === 'Counter') && actors.medical_near(g) !== null) {
     g.prompt = '[Y] Give medicine   [N] Send away';
@@ -1483,7 +1615,7 @@ export function player_system(g, dt_raw, ctx) {
   let placed_id = null;
   if (target.k === 'Prop' && g.props.some((p) => p.id === target.a && p.kind.k === 'Placed')) placed_id = target.a;
   // Kệ do người chơi dựng: nhắm vào ô nào của kệ cũng gỡ được.
-  else if (target.k === 'Shelf' && g.shelves[target.a].prop !== 0) placed_id = g.shelves[target.a].prop;
+  else if ((target.k === 'Shelf' || target.k === 'Tag') && g.shelves[target.a].prop !== 0) placed_id = g.shelves[target.a].prop;
   if (placed_id !== null && keys.pressed('KeyV')) {
     const id = placed_id;
     if (g.bld.pick_id !== id) {
@@ -1502,7 +1634,7 @@ export function player_system(g, dt_raw, ctx) {
     g.bld.pick_id = 0;
   }
   if (keys.just_pressed('KeyQ')) {
-    if (target.k === 'Shelf') {
+    if (target.k === 'Shelf' || target.k === 'Tag') {
       const it = g.shelves[target.a].slots[target.b];
       if (it !== null) {
         g.panel = { k: 'Price', a: it };
@@ -1512,7 +1644,7 @@ export function player_system(g, dt_raw, ctx) {
     }
   }
   if (mouse.just_pressed('Right')) {
-    if (target.k === 'Shelf') {
+    if (target.k === 'Shelf' || target.k === 'Tag') {
       const s = target.a, slot = target.b;
       const it = g.shelves[s].slots[slot];
       const n = game.case_units();

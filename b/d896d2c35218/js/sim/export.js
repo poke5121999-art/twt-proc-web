@@ -134,10 +134,10 @@ export function export_system(g, dt, ctx) {
   const cs = g.customers.map((c) => `[${rfix(c.pos.x, 2)},${rfix(c.pos.z, 2)},${game.CSTATE_ORDER.indexOf(c.state)},${c.basket.length}]`);
   const hc = actors.head_customer(g);
   const head = hc !== null ? g.customers[hc].at_head : -1.0;
-  let held = '';
+  let held = '', held_n = 0;
   if (g.held !== null) {
     const hp = g.props.find((p) => p.id === g.held);
-    if (hp !== undefined) held = kind_tag(hp.kind);
+    if (hp !== undefined) { held = kind_tag(hp.kind); held_n = hp.kind.k === 'Box' ? hp.kind.a.length : 1; }
   }
   let shelf = 0;
   let shelf_slots = 0;
@@ -165,7 +165,7 @@ export function export_system(g, dt, ctx) {
   const pay_alarm = g.pay !== null ? g.pay.alarm : -1;
   const med = g.customers.filter((c) => c.goal.k === 'Medical' && !c.gone).length;
   const elapsed = ctx.elapsed !== undefined && ctx.elapsed !== null ? ctx.elapsed : ex.elapsed;
-  let json = `{"mode":"${g.mode}","panel":"${panel_debug(g.panel)}","day":${g.day},"min":${rfix(g.minutes, 1)},"bat":${g.batteries},"rep":${rfix(g.rep, 3)},"open":${g.open},"hp":${rfix(g.hp, 1)},"pos":[${rfix(g.player.x, 3)},${rfix(g.player.y, 3)},${rfix(g.player.z, 3)}],"yaw":${rfix(g.yaw, 4)},"pitch":${rfix(g.pitch, 4)},"prompt":"${esc(g.prompt)}","notice":"${esc(g.notice_t > 0.0 ? g.notice : '')}","todo":[${todo.join(',')}],"props":[${props.join(',')}],"zs":[${zs.join(',')}],"cs":[${cs.join(',')}],"head":${rfix(head, 2)},"held":"${held}","armed":${g.armed},"shelf":${shelf},"shelfSlots":${shelf_slots},"stack":[${game.case_units()},${game.stack_max()}],"done":[${done.join(',')}],"inv":[${inv.join(',')}],"door":{"open":${g.door.open},"hp":${rfix(g.door.hp, 0)}},"raid":{"active":${g.raid.active},"wave":${g.raid.wave},"next":${g.raid.next_day}},"served":${g.total_served},"bedDoor":${g.bed_door_hits},"trash":${g.trash_done},"sweep":${g.sweep_done},"q":${ctx.quality.tier},"fps":${rfix(fps, 0)},"frames":${ex.frames},"sfx":${ex.sfx},"lastSfx":"${ex.last_sfx}","cine":${g.cine !== null ? g.cine[0] : -1},"ff":${g.ff},"pay":[${pay}],"payAlarm":${pay_alarm},"med":[${med},${actors.medical_near(g) !== null ? 1 : 0}],"gifts":${g.med_gifts.length},"staff":[${staff.export(g)}],"lm":[${Array.from(g.lm, (v) => String(v)).join(',')}],"lmhp":[${Array.from(g.lm_hp, (v) => rfix(v, 0)).join(',')}],"lmSel":${g.lm_sel},"craft":${craft.export(g)},${extra},"toast":"${g.toast_t > 0.0 ? g.toast : ''}","t":${rfix(elapsed, 1)}}`;
+  let json = `{"mode":"${g.mode}","panel":"${panel_debug(g.panel)}","day":${g.day},"min":${rfix(g.minutes, 1)},"bat":${g.batteries},"rep":${rfix(g.rep, 3)},"open":${g.open},"hp":${rfix(g.hp, 1)},"pos":[${rfix(g.player.x, 3)},${rfix(g.player.y, 3)},${rfix(g.player.z, 3)}],"yaw":${rfix(g.yaw, 4)},"pitch":${rfix(g.pitch, 4)},"prompt":"${esc(g.prompt)}","notice":"${esc(g.notice_t > 0.0 ? g.notice : '')}","todo":[${todo.join(',')}],"props":[${props.join(',')}],"zs":[${zs.join(',')}],"cs":[${cs.join(',')}],"head":${rfix(head, 2)},"held":"${held}","heldN":${held_n},"armed":${g.armed},"shelf":${shelf},"shelfSlots":${shelf_slots},"stack":[${game.case_units()},${game.stack_max()}],"done":[${done.join(',')}],"inv":[${inv.join(',')}],"door":{"open":${g.door.open},"hp":${rfix(g.door.hp, 0)}},"raid":{"active":${g.raid.active},"wave":${g.raid.wave},"next":${g.raid.next_day}},"served":${g.total_served},"bedDoor":${g.bed_door_hits},"trash":${g.trash_done},"sweep":${g.sweep_done},"q":${ctx.quality.tier},"fps":${rfix(fps, 0)},"frames":${ex.frames},"sfx":${ex.sfx},"lastSfx":"${ex.last_sfx}","cine":${g.cine !== null ? g.cine[0] : -1},"ff":${g.ff},"pay":[${pay}],"payAlarm":${pay_alarm},"med":[${med},${actors.medical_near(g) !== null ? 1 : 0}],"gifts":${g.med_gifts.length},"staff":[${staff.export(g)}],"lm":[${Array.from(g.lm, (v) => String(v)).join(',')}],"lmhp":[${Array.from(g.lm_hp, (v) => rfix(v, 0)).join(',')}],"lmSel":${g.lm_sel},"craft":${craft.export(g)},${extra},"toast":"${g.toast_t > 0.0 ? g.toast : ''}","t":${rfix(elapsed, 1)}}`;
   // Số biểu tượng món đã vẽ / tổng số (bot chờ vẽ xong rồi mới chụp).
   const im = scene.impl();
   const zoo = g.zoo ? (im && im.people && typeof im.people.zoo_info === 'function' ? im.people.zoo_info() : '') : '';

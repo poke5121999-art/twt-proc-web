@@ -40,7 +40,7 @@ const QUALITY = [
 
 // Optional view plug-ins (js/plug/<name>.js exporting install(G)): each upgrades one part of the picture or sound and can
 // be switched off with ?noplug=name,name (or all). ?plug=name loads one that is not in the default list yet.
-const PLUGINS = ['dress', 'env', 'fxaudio', 'loot', 'hands', 'stock', 'till'];
+const PLUGINS = ['dress', 'env', 'fxaudio', 'loot', 'hands', 'stock', 'till', 'pricetag'];
 const G = window.__G = { params, U, postFx: { flash: 0, hurt: 0 }, errors: [], t: 0, dt: 1 / 60, frames: 0, updaters: [], preRender: [], plugins: {}, THREE };
 const seen = new Set();
 G.prof = {};

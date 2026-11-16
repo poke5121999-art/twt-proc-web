@@ -109,8 +109,8 @@ export function upgrade_shader() {
  * trời (`sky`, `gnd` = trung bình mái mây x environmentIntensity 2). Bình minh, hoàng hôn và đêm là phần twt-proc thêm. */
 export const KEYS = Object.freeze([
   { h: 0.0, zenith: [0.012, 0.016, 0.03], horizon: [0.03, 0.03, 0.06], sun: [0.35, 0.45, 0.8], sun_k: 0.25, sky: [0.03, 0.035, 0.075], gnd: [0.015, 0.014, 0.026], fog: 0.0045, cloud: 1.0 },
-  { h: 4.5, zenith: [0.012, 0.016, 0.03], horizon: [0.03, 0.03, 0.06], sun: [0.35, 0.45, 0.8], sun_k: 0.25, sky: [0.03, 0.035, 0.075], gnd: [0.015, 0.014, 0.026], fog: 0.0045, cloud: 1.0 },
-  { h: 6.0, zenith: [0.1, 0.13, 0.2], horizon: [0.95, 0.5, 0.3], sun: [1.0, 0.6, 0.36], sun_k: 1.6, sky: [0.12, 0.15, 0.22], gnd: [0.06, 0.06, 0.065], fog: 0.005, cloud: 1.0 },
+  { h: 3.5, zenith: [0.012, 0.016, 0.03], horizon: [0.03, 0.03, 0.06], sun: [0.35, 0.45, 0.8], sun_k: 0.25, sky: [0.03, 0.035, 0.075], gnd: [0.015, 0.014, 0.026], fog: 0.0045, cloud: 1.0 },
+  { h: 5.0, zenith: [0.13, 0.12, 0.2], horizon: [1.0, 0.5, 0.36], sun: [1.0, 0.6, 0.4], sun_k: 1.7, sky: [0.12, 0.15, 0.22], gnd: [0.06, 0.06, 0.065], fog: 0.005, cloud: 1.0 },
   { h: 8.0, zenith: [0.16, 0.22, 0.3], horizon: [0.95, 0.55, 0.28], sun: [1.0, 0.72, 0.42], sun_k: 2.865, sky: [0.2, 0.25, 0.33], gnd: [0.1, 0.1, 0.105], fog: 0.0034, cloud: 1.0 },
   { h: 12.5, zenith: [0.16, 0.22, 0.3], horizon: [0.95, 0.55, 0.28], sun: [1.0, 0.72, 0.42], sun_k: 2.865, sky: [0.2, 0.25, 0.33], gnd: [0.1, 0.1, 0.105], fog: 0.0034, cloud: 1.0 },
   { h: 16.0, zenith: [0.16, 0.22, 0.3], horizon: [0.95, 0.55, 0.28], sun: [1.0, 0.72, 0.42], sun_k: 2.865, sky: [0.2, 0.25, 0.33], gnd: [0.1, 0.1, 0.105], fog: 0.0034, cloud: 1.0 },
@@ -124,10 +124,11 @@ export function l3(a, b, t) {
 }
 
 export function night_factor(hour) {
-  if (hour < 5.0 || hour >= 20.0) {
+  // Day 1 starts 5:30: the original game shows a lit pink dawn then (audit-ref m01), so night ends by 5:00.
+  if (hour < 3.5 || hour >= 20.0) {
     return 1.0;
-  } else if (hour < 6.5) {
-    return 1.0 - (hour - 5.0) / 1.5;
+  } else if (hour < 5.0) {
+    return 1.0 - (hour - 3.5) / 1.5;
   } else if (hour > 18.5) {
     return (hour - 18.5) / 1.5;
   } else {
@@ -190,8 +191,8 @@ export function update_env(g, dt, ctx) {
   const cloud = a.cloud + (b.cloud - a.cloud) * t;
   const night = night_factor(hour);
 
-  // Mặt trời mọc 6:00 phía đông (+x), lặn 19:30 phía tây, vòng qua phía nam (+z, mặt tiền quán).
-  const day_t = (hour - 6.0) / 13.5;
+  // Mặt trời mọc 5:00 phía đông (+x), lặn 19:30 phía tây, vòng qua phía nam (+z, mặt tiền quán).
+  const day_t = (hour - 5.0) / 14.5;
   let sun_dir;
   if (day_t >= 0.0 && day_t <= 1.0 && night < 0.999) {
     // Mặt trời luôn thấp (8 đến 20 độ) như Saltline (13 độ): bóng dài, nhìn ra đường là nhìn ngược sáng.

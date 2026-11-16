@@ -997,6 +997,9 @@ export function vm_key(g) {
         return VM_BASE + id * 64 + 1 + Math.min(kd.a.length, 60);
       case 'Corpse':
         return VM_DRAG;
+      case 'Item':
+        // [phiên 7] một món hàng cầm tay khi không có hộp (player.js, items.box_only)
+        return VM_BASE + id * 64 + 63;
       default:
         return null;
     }
@@ -1091,7 +1094,11 @@ export function build_vm(g, key, main, off) {
   }
   const id = trunc((key - VM_BASE) / 64);
   const kd = kind_of(g, id);
-  if (kd !== null && kd.k === 'Box') {
+  if (kd !== null && kd.k === 'Item') {
+    world.item_geo(main, kd.a, v(0.0, -0.06, 0.0), 1.6);
+    fp.arm(main, v(0.11, 0.0, 0.0), v(0.36, -0.3, 0.5), v(-1.0, 0.0, 0.0), 1.0);
+    fp.arm(off, v(-0.11, 0.0, 0.0), v(-0.36, -0.3, 0.5), v(1.0, 0.0, 0.0), -1.0);
+  } else if (kd !== null && kd.k === 'Box') {
     world.prop_geo(main, { k: 'Box', a: kd.a.slice() }, id);
     fp.arm(main, v(0.3, 0.13, 0.03), v(0.44, -0.16, 0.52), v(-1.0, 0.0, 0.0), 1.0);
     fp.arm(off, v(-0.3, 0.13, 0.03), v(-0.44, -0.16, 0.52), v(1.0, 0.0, 0.0), -1.0);
@@ -1147,6 +1154,11 @@ export function pose(g, key, eye, rot, bob) {
     return [tr(grip, q_arc(Y, dir)), hidden];
   }
   const lift = v3(0.0, -e * 0.45, 0.0);
+  if ((key - VM_BASE) % 64 === 63) {
+    // một món hàng cầm hai tay trước ngực
+    const t = tr(v3(0.0, -0.36, -0.48).add(bobv).add(lift), q_x(0.25));
+    return [t, tr(t.translation.clone(), t.rotation.slice())];
+  }
   if ((key - VM_BASE) % 64 !== 0) {
     // Hộp các-tông: ôm trước bụng, nghiêng về phía mắt để thấy đồ bên trong.
     const t = tr(v3(0.0, -0.5, -0.6).add(bobv).add(lift), q_x(0.55));

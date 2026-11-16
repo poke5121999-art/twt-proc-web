@@ -143,6 +143,10 @@ export function stack_max() {
 /// clip 02 Zanzibar 21:20-22:00 44 -> 62). Món nằm trên đất nhặt từng món: cầm hộp các-tông thì vào hộp ("Carry", clip 04
 /// 28:37-28:47, thanh 0/80 -> 30/80 -> 45/80), không cầm hộp thì vào ba lô như món rời có sẵn. `?loot=bag` = bản cũ (mọi
 /// món vào thẳng ba lô).
+/// `?shelves=2`: hai kệ ba tầng của bản trước phiên 7 (mặc định: một kệ ván bắt tường).
+export function two_shelves() {
+  return query('shelves') === '2';
+}
 export function loot_bag() {
   return query('loot') === 'bag';
 }
@@ -181,6 +185,8 @@ export class Shelf {
     this.ent = null;
     /// id của vật dựng (Prop) sinh ra kệ này; 0 = kệ cố định.
     this.prop = prop;
+    /// Kệ ván bắt tường: tầng = hàng từ trước ra sau trên một tấm ván (lay.PLANK_*).
+    this.plank = false;
   }
   static new(pos, yaw, cols, levels, prop) {
     return new Shelf(pos, yaw, cols, levels, prop);
@@ -192,6 +198,7 @@ export class Shelf {
   slot_pos(slot) {
     const col = slot % this.cols;
     const lvl = Math.trunc(slot / this.cols);
+    if (this.plank) return this.pos.add(rot_y(this.yaw, v3((col + 0.5 - this.cols * 0.5) * lay.SLOT_W, lay.PLANK_TOP + 0.05, lay.PLANK_ROWS[Math.min(lvl, 2)])));
     return this.pos.add(rot_y(this.yaw, v3((col + 0.5 - this.cols * 0.5) * lay.SLOT_W, 0.5 + lvl * 0.5, 0.0)));
   }
   /// Chỗ khách (hoặc bot) đứng trước ô `slot`.
@@ -774,10 +781,13 @@ export class Game {
     this.hour_mark = -1;
     this.prices = prices;
     this.inv = new Array(N_ITEMS).fill(0);
-    this.shelves = [
+    // [phiên 7] Một kệ ván bắt tường đông lúc mở ván (ảnh bản gốc ngày 2 của chủ dự án); kệ thêm thì chế tạo / dựng.
+    // `?shelves=2` giữ hai kệ ba tầng cũ.
+    this.shelves = two_shelves() ? [
       new Shelf(v3(lay.SHELVES[0][0], 0.0, lay.SHELF_Z0 + 3.5 * lay.SLOT_W), Math.PI / 2, SHELF_COLS, 3, 0),
       new Shelf(v3(lay.SHELVES[1][0], 0.0, lay.SHELF_Z0 + 3.5 * lay.SLOT_W), -Math.PI / 2, SHELF_COLS, 3, 0),
-    ];
+    ] : [new Shelf(v3(lay.SHELVES[1][0], 0.0, lay.SHELF_Z0 + 3.5 * lay.SLOT_W), -Math.PI / 2, SHELF_COLS, 3, 0)];
+    if (this.shelves.length === 1) this.shelves[0].plank = true;
     this.hp = 100.0;
     this.hp_max = 100.0;
     this.since_hit = 99.0;
@@ -971,7 +981,7 @@ export class Game {
     for (const [name, p, its] of caches) {
       this.add_prop(PropKind.Cache(name, its, false), p, 0.0);
     }
-    // [ĐỀ XUẤT phiên 7] Đống hộp các-tông gấp dẹt cạnh hộp đầu tiên (clip 03 3:05: người chơi lấy hộp từ đống
+    // [ĐỀ XUẤT phiên 7] Đống hộp các-tông gấp dẹt trong quán cạnh cửa trước (clip 03 3:05: người chơi lấy hộp từ đống
     // "Cardboard Boxes"): [E] lấy một hộp rỗng, tối đa BOX_PILE_MAX hộp nằm quanh quán. Thêm sau cùng để id cũ không đổi.
     this.add_prop(PropKind.BoxPile(), lay.BOX_PILE, 0.15);
   }
@@ -1216,6 +1226,12 @@ export class Game {
       const d = p.pos.distance(me);
       if (d < idist) { idist = d; item = p; }
     }
+    const hb = held !== null ? this.prop(held) : null;
+    const goods = (it) => items.sellable(it) && !items.is_material(it);
+    const boxGoods = hb !== null && ((hb.kind.k === 'Box' && hb.kind.a.some(goods)) || (hb.kind.k === 'Item' && goods(hb.kind.a)));
+    if (boxGoods && free > 0) {
+      return ['[E] on a shelf to restock from the box you carry (the price tag on the shelf lip: [E] set price)', this.shelves[0].slot_pos(10), 'Restock the shelves from your box.'];
+    }
     if (filled === 0 && have) {
       return ['The shelves are empty: [E] on a shelf to restock from your backpack     [R] change item', this.shelves[0].slot_pos(10), 'Restock the shelves from your backpack.'];
     }
@@ -1233,7 +1249,13 @@ export class Game {
       const d = p.pos.distance(from) + behind + (inside ? me.distance(lay.DOOR_OUT) : 0.0);
       if (d < bd) { bd = d; best = p; }
     }
+    // [phiên 7] hàng chỉ vào hộp: chưa cầm hộp thì việc đầu tiên là lấy hộp ở đống cạnh cửa
+    const hp = this.held !== null ? this.prop(this.held) : null;
+    const pile = this.props.find((p) => !p.dead && p.kind.k === 'BoxPile');
+    const boxFirst = best !== null && pile !== undefined && !loot_bag() && !(hp !== null && hp.kind.k === 'Box');
+    const BOX_TIP = ['Take an empty cardboard box from the pile by the front door first: goods and materials only fit in a box', pile ? pile.pos.add(Y.mul(0.5)) : null, 'Take a box, then search outside for goods.'];
     if (filled === 0) {
+      if (boxFirst) return BOX_TIP;
       if (best !== null) {
         return ['Out of stock: search the bags, trolleys and crates outside for goods to sell ([hold E] on the marked one)', best.pos.add(Y.mul(0.6)), 'Out of stock. Search outside for goods to sell.'];
       }
@@ -1244,6 +1266,7 @@ export class Game {
     }
     if (this.open) {
       if (best !== null && filled <= 6) {
+        if (boxFirst) return BOX_TIP;
         return ['Stock is running low: search outside for more goods ([hold E] on the marked one), customers queue at the till meanwhile', best.pos.add(Y.mul(0.6)), `Stock is low. Search outside for goods (${left} places left).`];
       }
       return [best !== null ? 'Customers come in waves: wait behind the counter, or use the quiet time to search outside for more goods' : 'Customers come in waves: wait behind the counter and [E] serve them at the till',

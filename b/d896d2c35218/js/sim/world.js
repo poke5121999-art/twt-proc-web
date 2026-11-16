@@ -107,7 +107,7 @@ export const COLLIDERS = lazy_array(() => {
     lay.INTEL_BOX.slice(),
     [lay.SIREN.x - 0.5, lay.SIREN.z - 0.5, lay.SIREN.x + 0.5, lay.SIREN.z + 0.5],
     lay.COUNTER_BOX.slice(),
-    [-4.95, -1.65, -4.3, 2.65],
+    G.two_shelves() ? [-4.95, -1.65, -4.3, 2.65] : [-4.95, -1.65, -4.94, -1.64], // kệ tây chỉ có với ?shelves=2
     [4.3, -1.65, 4.95, 2.65],
     [lay.BED_BOX[0].x, lay.BED_BOX[0].z, lay.BED_BOX[1].x, lay.BED_BOX[1].z],
     lay.BED_CRATES.slice(),
@@ -613,7 +613,7 @@ function build_shop(mb, glass, g) {
   mb.cyl(new Vec3(-4.3, 0.0, 4.7), 0.28, 0.28, 0.85, 10, hex(0x7a4a32), CORRUGATED);
   models.facade(mb);
   models.counter(mb);
-  models.shelves(mb);
+  models.shelves(mb, g.shelves.filter((sh) => sh.prop === 0));
   // Nút báo động ở đầu trái quầy.
   const al = player.ALARM;
   mb.cube(al.sub(Y.mul(0.01)), new Vec3(0.14, 0.03, 0.14), hex(0x30353a), METAL);
@@ -1250,7 +1250,8 @@ export function shelf_unit_pos(sh, s, k) {
   // [ĐỀ XUẤT] Ô chồng nhiều món lẻ (G.case_units): xếp thành hàng 4 món dọc kệ, hàng trước đầy trước rồi lùi vào trong;
   // mọi món đứng thẳng trên mặt ván (không chồng lơ lửng).
   const per = 4, rows = Math.max(1, Math.ceil(G.stack_max() / per));
-  const dz = rows > 1 ? Math.min(0.2, 0.4 / (rows - 1)) : 0.0;
+  // kệ ván: mỗi ô chỉ sâu một hàng của tấm ván (0,19 m) nên các hàng món lẻ sát nhau hơn
+  const dz = rows > 1 ? (sh.plank ? Math.min(0.09, 0.18 / (rows - 1)) : Math.min(0.2, 0.4 / (rows - 1))) : 0.0;
   const col = k % per, row = Math.trunc(k / per);
   const lx = (col - 1.5) * 0.14 + (row % 2) * 0.02;
   const lz = (rows - 1) * dz * 0.5 - row * dz;
