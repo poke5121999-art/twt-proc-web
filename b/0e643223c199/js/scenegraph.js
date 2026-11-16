@@ -32,7 +32,7 @@ export const PAT_ENV = {
   2: { surf: 'concrete2', scale: 0.333, macro: 0.14, grime: 0.3, wetP: CA, dryIn: true },
   3: { surf: 'asphalt2', scale: 0.5, macro: 0.14, grime: 0.3, wetP: [0.45, 0.3, 0.5, 0], dryIn: true },
   4: { surf: 'brick2', tint: 1, pshade: 1, scale: 1.111, macro: 0.12, grime: 0.25, wetP: CA, dryIn: true },
-  5: { surf: 'corrugated2', tint: 1, pshade: 1, scale: 0.658, macro: 0.12, grime: 0.2, wetP: KC, dryIn: true },
+  5: { surf: 'corrugated2', tint: 1, pshade: 1, scale: 0.658, macro: 0.12, grime: 0.2, wetP: KC, dryIn: true, detile: [0.35, 0.53] },
   6: { surf: 'dirt2', scale: 0.3, macro: 0.3, grime: 0.2, wetP: [0.5, 0.5, 0.5, 0], dryIn: true },
   7: { surf: 'block2', tint: 1, pshade: 0.7, scale: 0.625, macro: 0.1, grime: 0.22, wetP: [0.35, 0.6, 0.4, 0], dryIn: true },
   8: { surf: 'cardboard2', scale: 1.0, macro: 0.08, grime: 0.1, wetP: [0.4, 0.75, 0.6, 0], dryIn: true },

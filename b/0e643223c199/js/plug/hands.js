@@ -213,9 +213,9 @@ function poseArm(arm, grip, trig, t) {
     const sh = u.shut || SHUT;
     for (let k = 0; k < 3; k++) f.segs[k].rotation.x = OPEN[k] + (sh[k] - OPEN[k]) * gk + w;
   }
-  const tg = grip * (flat ? 0.2 : 1);
-  u.tseg[0].rotation.x = -u.ts * (0.25 + 0.75 * tg);
-  u.tseg[1].rotation.x = -u.ts * (0.15 + 0.85 * tg);
+  const tg = grip * (flat ? 0.2 : 1), tk = u.opts.thumb || 1;
+  u.tseg[0].rotation.x = -u.ts * (0.25 + 0.75 * tg * tk);
+  u.tseg[1].rotation.x = -u.ts * (0.15 + 0.85 * tg * tk);
 }
 
 // ------------------------------------------------------------------ particles (vacuum dust stream, muzzle flash)
@@ -308,7 +308,8 @@ const GUN_GRIP = {
   Sniper: { main: [0.2, 1, 0], r0: 0.015, off: [1, 0, 0], r1: 0.022 },
   Shotgun: { main: [0.2, 1, 0], r0: 0.016, off: [1, 0, 0], r1: 0.0285 },
   Crossbow: { main: [0.2, 1, 0], r0: 0.016, off: [1, 0, 0], r1: 0.022 },
-  Launcher: { main: [0.18, 1, 0], r0: 0.016, off: [1, 0, 0], r1: 0.02 },
+  // launcher: the left hand closes round the upright front grip plate from the left, elbow tucked low and back
+  Launcher: { main: [0.18, 1, 0], r0: 0.016, off: [0, 1, 0], r1: 0.016, offPalm: [0.25, 0, 1], offElbow: [0.02, -0.3, -0.52] },
   Minigun: { main: [0.18, 1, 0], r0: 0.016, off: [1, 0, 0], r1: 0.02 },
   Flame: { main: [0.18, 1, 0], r0: 0.016, off: [1, 0, 0], r1: 0.024 },
   Saw: { main: [0.18, 1, 0], r0: 0.016, off: [1, 0, 0], r1: 0.024 },
@@ -379,7 +380,7 @@ export async function install(G) {
     }
     grips.forEach((list, part) => list.forEach((gp) => {
       const node = nodes[part]; if (!node) return;
-      let a0 = null, opts = {}, gpos = v3(gp.grip), palm = v3(gp.palm);
+      let a0 = null, opts = {}, gpos = v3(gp.grip), palm = v3(gp.palm), elb = v3(gp.elbow);
       if (kind === 'gun') {
         const G0 = GUN_GRIP[spec.class] || GUN_GRIP.Rifle;
         if (spec.class === 'Bow') { a0 = V(0, 1, 0); opts.r = gp.side > 0 ? 0.009 : 0.016; }
@@ -388,10 +389,16 @@ export async function install(G) {
           a0 = V(...G0.off); opts.r = G0.r1;
           if (G0.offAt) gpos.add(V(...G0.offAt));
           if (G0.offPalm) palm = V(...G0.offPalm);
+          if (G0.offElbow) elb = V(...G0.offElbow);
         }
-      } else if (kind === 'melee' || kind === 'throw' || kind === 'broom' || kind === 'trash') { a0 = V(0, 1, 0); opts.r = kind === 'throw' ? 0.022 : kind === 'trash' ? 0.02 : kind === 'broom' ? 0.016 : 0.018; }
+      } else if (kind === 'melee' || kind === 'throw' || kind === 'broom' || kind === 'trash') {
+        a0 = V(0, 1, 0); opts.r = kind === 'throw' ? 0.022 : kind === 'trash' ? 0.02 : kind === 'broom' ? 0.016 : 0.014;
+        // melee: a hard fist round the handle, thumb locked over the fingers, the palm turned a little toward the camera
+        // so the curled fingers read from the player's eye
+        if (kind === 'melee') { opts.thumb = 1.4; palm = V(-0.55, 0, -1); }
+      }
       else if (kind === 'box') opts.flat = true;
-      const arm = buildArm(kit, mat, gpos, v3(gp.elbow), palm, a0, opts);
+      const arm = buildArm(kit, mat, gpos, elb, palm, a0, opts);
       node.obj.add(arm); S.arms.push(arm);
       // magazine guns: a second left hand on the magazine, shown while the rules pull the magazine away (reload), so the
       // hand that rides the magazine mesh is on the magazine, not floating where the handguard was

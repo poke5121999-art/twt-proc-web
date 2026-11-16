@@ -204,6 +204,17 @@ export function update_env(g, dt, ctx) {
     sun_dir = v3((hx / hl) * Math.cos(elev), Math.sin(elev), (hz / hl) * Math.cos(elev));
   } else {
     sun_dir = v3(-0.35, 0.75, 0.45).normalize();
+    // Before sunrise the key light swings from the moon toward the sunrise point as the night lifts (3:30-5:00), so the
+    // light does not jump from high moon to an 8-degree sun at 5:00 (ground dropped ~25 % in one frame at speed).
+    // Same after sunset: from the 8-degree west sun at 19:30 to the moon by 20:00.
+    const e0 = (8.0 * Math.PI) / 180.0, hl0 = Math.sqrt(1.0 + 0.55 * 0.55);
+    if (hour < 12.0 && night < 0.999) {
+      const rise = v3((1.0 / hl0) * Math.cos(e0), Math.sin(e0), (0.55 / hl0) * Math.cos(e0));
+      sun_dir = sun_dir.lerp(rise, 1.0 - night).normalize();
+    } else if (hour >= 12.0 && hour < 20.0) {
+      const set = v3((-1.0 / hl0) * Math.cos(e0), Math.sin(e0), (0.55 / hl0) * Math.cos(e0));
+      sun_dir = set.lerp(sun_dir, Math.min(Math.max((hour - 19.5) / 0.5, 0.0), 1.0)).normalize();
+    }
   }
 
   // Raid: cả cảnh ngả đỏ (bản gốc nhuộm trời, đất và sương màu đỏ).

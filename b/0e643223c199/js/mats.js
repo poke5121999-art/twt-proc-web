@@ -16,7 +16,7 @@ export function setBaker(b) { baker = b; }
 
 const FRAG_HEAD = /* glsl */`
 uniform float uTime, uRain, uGunWet; uniform vec4 uFlood; uniform vec4 uIndoor[4]; uniform float uIndoorH[4];
-uniform sampler2D tAlb, tOrm, tNrm;
+uniform sampler2D tAlb, tOrm, tNrm; uniform vec2 uDetile;
 uniform vec3 uPaint;
 uniform vec3 uNorm; uniform float uGlow; uniform vec3 uPRef; uniform float uPShade, uIndoorWet;
 uniform float uScale, uNScale, uMacro, uWetK, uPuddle, uDrops, uRoughK, uMetalK, uAOK, uWetR, uGrime;
@@ -31,6 +31,21 @@ const VERT_HEAD = /* glsl */`
 varying vec3 vTP; varying vec3 vTN; varying vec3 vWP; varying vec3 vWN;
 `;
 
+// Anti-tiling (o.detile = [du, dv]): a second read of the bake shifted by (du, dv) texture units, blended in by a
+// world-space noise mask about 2 m across, so a big wall stops showing the same rust blooms every tile. du should keep
+// the pattern's own period (corrugated tin: a whole number of ridges, 1/20 of the tile) so ridges still line up.
+const DETILE_A = `
+      float dtM = smoothstep(0.36, 0.64, vn3(vWP*0.42 + 11.3)*0.7 + vn3(vWP*1.3 + 4.1)*0.3);
+      vec2 dtO = uDetile;
+      vec4 alb2 = texture2D(tAlb, P.zy + dtO)*tw.x + texture2D(tAlb, P.xz + dtO)*tw.y + texture2D(tAlb, P.xy + dtO)*tw.z;
+      vec3 orm2 = (texture2D(tOrm, P.zy + dtO)*tw.x + texture2D(tOrm, P.xz + dtO)*tw.y + texture2D(tOrm, P.xy + dtO)*tw.z).rgb;
+      alb = mix(alb, alb2, dtM); orm = mix(orm, orm2, dtM);
+      // paint loss (alb.a < 1) only in irregular world-space patches and toward the ground, not in every tile
+      float dtR = smoothstep(0.45, 0.75, vn3(vWP*0.31 + 2.7)*0.8 + vn3(vWP*1.7 + 9.2)*0.2 + 0.3*smoothstep(1.4, 0.0, vWP.y));
+      alb.a = mix(1.0, alb.a, dtR);`;
+const DETILE_N = `
+        nX = mix(nX, texture2D(tNrm, P.zy + dtO).xyz*2.0-1.0, dtM); nY = mix(nY, texture2D(tNrm, P.xz + dtO).xyz*2.0-1.0, dtM); nZ = mix(nZ, texture2D(tNrm, P.xy + dtO).xyz*2.0-1.0, dtM);`;
+
 function patch(shader, o) {
   Object.assign(shader.uniforms, {
     uTime: U.uTime, uRain: U.uRain, uGunWet: U.uGunWet, uFlood: U.uFlood, uIndoor: U.uIndoor, uIndoorH: U.uIndoorH,
@@ -40,6 +55,7 @@ function patch(shader, o) {
     uScale: { value: o.scale ?? 0.5 }, uNScale: { value: o.nscale ?? 1 }, uMacro: { value: o.macro ?? 0.25 },
     uWetK: { value: o.wet === false ? 0 : (o.wetK ?? 1) }, uPuddle: { value: o.puddles === 'flood' ? 0.75 : o.puddles ? 1 : 0 }, uDrops: { value: o.drops ? 1 : 0 },
     uWetP: { value: wetParams(o) }, uGrime: { value: o.grime ?? (BIG.has(o.surf) ? 0.35 : 0.2) },
+    uDetile: { value: new THREE.Vector2(...(o.detile || [0, 0])) },
     uRoughK: { value: o.roughK ?? 1 }, uMetalK: { value: o.metalK ?? 1 }, uAOK: { value: o.aoK ?? 1 }, uWetR: { value: o.wetRough ?? 0.16 },
   });
   const objectSpace = o.space === 'object';
@@ -66,6 +82,7 @@ function patch(shader, o) {
       vec4 alb = aX*tw.x + aY*tw.y + aZ*tw.z;
       vec4 oX = texture2D(tOrm, P.zy), oY = texture2D(tOrm, P.xz), oZ = texture2D(tOrm, P.xy);
       vec3 orm = (oX*tw.x + oY*tw.y + oZ*tw.z).rgb;
+      ${o.detile ? DETILE_A : ''}
       vec3 WN = normalize(vWN);
       float macro = fbm3(vWP*0.13);
       float macro2 = vn(vWP.xz*0.6+vWP.y*0.3);
@@ -138,6 +155,7 @@ function patch(shader, o) {
     .replace('#include <normal_fragment_maps>', `
       {
         vec3 nX = texture2D(tNrm, P.zy).xyz*2.0-1.0, nY = texture2D(tNrm, P.xz).xyz*2.0-1.0, nZ = texture2D(tNrm, P.xy).xyz*2.0-1.0;
+        ${o.detile ? DETILE_N : ''}
         float ns = uNScale * (1.0 - puddle * 0.9) * (1.0 - 0.45 * wet * up);
         nX.xy *= ns; nY.xy *= ns; nZ.xy *= ns;
         nX = vec3(nX.xy + N0.zy, abs(nX.z) * N0.x);
@@ -204,7 +222,7 @@ export function mat(o) {
   if (o.emissive) { m.emissive = new THREE.Color(o.emissive); m.emissiveIntensity = o.emissiveIntensity ?? 1; }
   const oo = Object.assign({}, o, { set });
   m.onBeforeCompile = (sh) => patch(sh, oo);
-  m.customProgramCacheKey = () => 'gc:' + (o.space || 'w') + (o.drops ? 'd' : '') + (o.puddles ? 'p' : '') + (o.vcol ? 'v' : '') + (o.emi ? 'e' : '') + (o.tint ? 't' + o.tint : '');
+  m.customProgramCacheKey = () => 'gc:' + (o.space || 'w') + (o.drops ? 'd' : '') + (o.puddles ? 'p' : '') + (o.vcol ? 'v' : '') + (o.emi ? 'e' : '') + (o.tint ? 't' + o.tint : '') + (o.detile ? 'x' : '');
   if (o.vcol) m.vertexColors = true;
   m.userData.opts = o;
   m.defines = {};

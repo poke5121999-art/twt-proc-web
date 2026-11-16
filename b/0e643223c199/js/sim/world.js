@@ -71,6 +71,20 @@ export const SHADOW_BOXES = lazy_array(() => {
   return v;
 });
 
+/** Đồ lớn áp tường trong nhà kho và phòng mở rộng (fin-visuals, `warehouse_dress` / `expansion_dress`): (minx, minz, maxx, maxz).
+ * Chừa >= 0,9 m quanh cửa kho, bàn chế tạo, máy nghiền, máy phát, chỗ đứng của chúng, giữa phòng mở rộng và lối thông phòng
+ * (kiểm bằng `three/tools/t-props.mjs`). Đồ nhỏ trên sàn (xô sơn, bạt, cột thép mỏng, cuộn ống) không có hộp. */
+export const PROP_BOXES = [
+  [-3.65, -18.95, 3.42, -18.05], // giá kệ công nghiệp tường bắc
+  [-5.0, -17.55, -4.1, -7.45], // ba giá gỗ tường tây (có từ trước, chưa từng có hộp)
+  [13.75, -15.5, 14.75, -12.3], // thùng gỗ chồng tường đông
+  [13.45, -10.75, 14.75, -9.3], // bốn thùng phuy
+  [14.55, -16.15, 14.75, -15.45], // tủ điện
+  [9.95, -18.95, 10.45, -18.0], // thang nhôm dựa tường bắc
+  [13.25, -5.0, 13.7, -4.2], // thang gấp phòng mở rộng 1
+  [22.3, -5.0, 24.6, -4.55], // chồng ván phòng mở rộng 2
+];
+
 /** Vật cản tĩnh trên mặt phẳng XZ: (minx, minz, maxx, maxz). Cửa còn đóng và tường chưa phá nằm ở `g.bld.cols`. */
 export const COLLIDERS = lazy_array(() => {
   const DZ = DZ_();
@@ -101,6 +115,7 @@ export const COLLIDERS = lazy_array(() => {
     [w[0], w[1], w[0] + 0.25, w[3]],
     [w[0], w[1], w[2], w[1] + 0.25],
     [w[2] - 0.25, w[1], w[2], w[3]],
+    ...PROP_BOXES.map((b) => b.slice()),
     lay.WORKBENCH_BOX.slice(),
     lay.SHREDDER_BOX.slice(),
     lay.GENERATOR_BOX.slice(),
@@ -331,7 +346,7 @@ function generator(mb, fixed) {
   mb.block(new Vec3(b[0] + 0.2, 0.72, b[1] + 0.3), new Vec3(b[2] - b[0] - 0.4, 0.25, b[3] - b[1] - 0.7), hex(0xb0342a), METAL);
   mb.cyl(new Vec3(cx + 0.3, 0.72, cz + 0.5), 0.05, 0.05, 0.9, 6, hex(0x5a5f63), METAL);
   mb.emi = fixed ? 1.1 : 0.0;
-  mb.cube(new Vec3(b[0] - 0.01, 0.6, cz), new Vec3(0.03, 0.08, 0.08), fixed ? hex(0x3ad06a) : hex(0x5a1f1c), FLAT);
+  mb.cube(new Vec3(b[0] + 0.14, 0.6, cz), new Vec3(0.03, 0.08, 0.08), fixed ? hex(0x3ad06a) : hex(0x5a1f1c), FLAT); // status lamp on the body's face
   mb.emi = 0.0;
 }
 
@@ -361,6 +376,162 @@ function intel_station(mb, tier) {
     }
     mb.emi = 0.0;
   }
+}
+
+/** Nhà kho đã mở: khung thép (cột chữ I, vì kèo, thanh giằng tường), giá kệ công nghiệp dọc tường bắc có hàng, thùng gỗ chồng
+ * và thùng phuy dọc tường đông, thang dựa tường, tủ điện + ống luồn gần máy phát, cuộn ống, vạch sơn lối đi, vết dầu, dây treo
+ * đèn (không vết dầu: đĩa phẳng cạnh sắc trông như lỗ). Mọi thứ áp tường (sâu dưới 1 m), chừa cửa kho, bàn chế tạo, máy nghiền, máy phát và chỗ đứng của chúng. Chỉ là hình. */
+function warehouse_dress(mb, w, hh) {
+  const steel = hex(0x4a5a6a), rack = hex(0xd06a1e), beam = hex(0x2f5f9a), wood = hex(0x8a6c48), box = hex(0xb08a55);
+  const r = Rng.named('whdress');
+  const N = w[1] + 0.25, S = w[3] - 0.25, E = w[2] - 0.25; // mặt trong tường bắc, nam, đông
+  // Cột chữ I (lòng + hai cánh) áp tường bắc và nam, vì kèo ngang trần nối hai cột, bát chân cột.
+  const icol = (x, z, dz) => {
+    const z0 = dz > 0 ? z : z - 0.22; // web out from the wall face, a flange on the wall and one in front
+    mb.block(new Vec3(x - 0.03, 0.0, z0), new Vec3(0.06, hh, 0.22), steel, METAL);
+    for (const fz of [z0, z0 + 0.2]) mb.block(new Vec3(x - 0.11, 0.0, fz), new Vec3(0.22, hh, 0.02), shade(steel, 0.9), METAL);
+    mb.block(new Vec3(x - 0.13, 0.0, dz > 0 ? z : z - 0.26), new Vec3(0.26, 0.03, 0.26), hex(0x3a3d40), METAL);
+  };
+  for (const x of [-1.2, 3.6, 8.4, 12.4]) {
+    icol(x, N, 1); icol(x, S, -1);
+    // vì kèo: thanh dưới, thanh trên, thanh chéo răng cưa
+    mb.block(new Vec3(x - 0.05, hh - 0.62, N), new Vec3(0.1, 0.08, S - N), steel, METAL);
+    mb.block(new Vec3(x - 0.05, hh - 0.14, N), new Vec3(0.1, 0.08, S - N), steel, METAL);
+    const n = 8, L = (S - N) / n;
+    for (let k = 0; k < n; k++) {
+      const z0 = N + k * L, z1 = z0 + L, ya = k % 2 ? hh - 0.58 : hh - 0.12, yb = k % 2 ? hh - 0.12 : hh - 0.58;
+      mb.tube(new Vec3(x, ya, z0), new Vec3(x, yb, z1), 0.02, 0.02, 5, shade(steel, 0.85), METAL);
+    }
+  }
+  // Thanh giằng ngang trên ba bức tường ở 3,5 m.
+  mb.block(new Vec3(w[0] + 0.25, 3.45, N), new Vec3(E - w[0] - 0.25, 0.12, 0.05), shade(steel, 0.8), METAL);
+  mb.block(new Vec3(E - 0.05, 3.45, N), new Vec3(0.05, 0.12, S - N), shade(steel, 0.8), METAL);
+  // Giá kệ công nghiệp tường bắc: cột cam, thanh xà xanh, ván sàn kệ, x -3,6..3,4 (tránh giá tây và máy nghiền).
+  const rx0 = -3.6, rx1 = 3.3, rz0 = N, rz1 = N + 0.85, lv = [0.12, 1.3, 2.45];
+  for (const x of [rx0, (rx0 + rx1) * 0.5, rx1]) for (const z of [rz0 + 0.02, rz1 - 0.08]) mb.block(new Vec3(x, 0.0, z), new Vec3(0.07, 3.2, 0.06), rack, METAL);
+  for (const x of [rx0, (rx0 + rx1) * 0.5, rx1]) for (let k = 0; k < 5; k++) mb.tube(new Vec3(x + 0.035, 0.3 + k * 0.6, rz0 + 0.05), new Vec3(x + 0.035, 0.6 + k * 0.6, rz1 - 0.05), 0.012, 0.012, 4, rack, METAL);
+  for (const y of lv) {
+    for (const z of [rz0 + 0.02, rz1 - 0.1]) mb.block(new Vec3(rx0, y, z), new Vec3(rx1 - rx0 + 0.07, 0.09, 0.08), beam, METAL);
+    mb.block(new Vec3(rx0 + 0.04, y + 0.09, rz0 + 0.04), new Vec3(rx1 - rx0, 0.025, rz1 - rz0 - 0.08), shade(wood, 0.9), WOOD);
+  }
+  // Hàng trên kệ: thùng các-tông, bao tải, tháp hộp thiếc, can sơn, thùng nhựa.
+  const top = (y) => y + 0.115;
+  const putBox = (x, y, wd, h, d, c) => mb.block(new Vec3(x, top(y), rz0 + 0.06 + (0.7 - d) * 0.5), new Vec3(wd, h, d), c, CARDBOARD);
+  let x = rx0 + 0.15;
+  while (x < rx1 - 0.6) { const wd = r.range(0.45, 0.75); putBox(x, lv[0], wd, r.range(0.4, 0.75), r.range(0.5, 0.65), shade(box, r.range(0.75, 1.05))); x += wd + r.range(0.05, 0.25); }
+  x = rx0 + 0.2;
+  for (let k = 0; k < 4; k++) { // bao tải nằm
+    mb.push(m4_mul(m4_translate(new Vec3(x + 0.35, top(lv[1]) + 0.17, rz0 + 0.42)), m4_rot_x(Math.PI / 2)));
+    mb.cyl(new Vec3(0, -0.28, 0), 0.18, 0.16, 0.56, 8, shade(hex(0xa89a72), r.range(0.8, 1.0)), CARDBOARD);
+    mb.pop();
+    x += 0.62;
+  }
+  for (let row = 0; row < 3; row++) for (let k = 0; k < 4 - row; k++) { // tháp hộp thiếc
+    mb.cyl(new Vec3(rx1 - 1.3 + k * 0.17 + row * 0.085, top(lv[1]) + row * 0.13, rz0 + 0.35), 0.075, 0.075, 0.125, 10, k % 2 ? hex(0xb03a2a) : hex(0xc9a43a), METAL);
+  }
+  for (let k = 0; k < 5; k++) { // can sơn
+    const cx = rx0 + 0.3 + k * 0.34;
+    mb.cyl(new Vec3(cx, top(lv[2]), rz0 + 0.4), 0.13, 0.13, 0.3, 12, shade([hex(0x3a6a9a), hex(0xd0c8b0), hex(0x8a2a22)][k % 3], r.range(0.8, 1.0)), METAL);
+    mb.cyl(new Vec3(cx, top(lv[2]) + 0.3, rz0 + 0.4), 0.135, 0.135, 0.015, 12, hex(0x9aa0a4), METAL);
+  }
+  for (let k = 0; k < 3; k++) putBox(rx0 + 2.2 + k * 0.85, lv[2], 0.7, 0.4, 0.55, k === 1 ? hex(0x3a5a3a) : hex(0x4a4f55));
+  // Thùng gỗ chồng dọc tường đông (z -15,6..-12,2) và thùng phuy (z -10,6..-8,8): tránh máy phát và pallet.
+  const crate = (cx, y, cz, s) => {
+    mb.block(new Vec3(cx - s / 2, y, cz - s / 2), new Vec3(s, s, s), shade(wood, r.range(0.8, 1.05)), WOOD);
+    for (const yy of [y + 0.04, y + s - 0.1]) {
+      mb.block(new Vec3(cx - s / 2 - 0.012, yy, cz - s / 2 - 0.012), new Vec3(s + 0.024, 0.06, s + 0.024), shade(wood, 0.7), WOOD);
+    }
+  };
+  for (const [cz, n] of [[-15.0, 3], [-13.9, 2], [-12.8, 3]]) for (let k = 0; k < n; k++) crate(E - 0.5, k * 0.9, cz, 0.9);
+  for (const [dx, dz, c] of [[0.0, 0.0, 0x2f5a3a], [-0.62, 0.15, 0x8a2a22], [0.0, 0.62, 0x2f4a6a], [-0.6, 0.78, 0x6a6a5a]]) {
+    const bx = E - 0.36 + dx, bz = -10.4 + dz;
+    mb.cyl(new Vec3(bx, 0.0, bz), 0.29, 0.29, 0.88, 14, hex(c), METAL);
+    for (const y of [0.29, 0.58]) mb.cyl(new Vec3(bx, y, bz), 0.3, 0.3, 0.03, 14, shade(hex(c), 0.7), METAL);
+    mb.cyl(new Vec3(bx + 0.12, 0.88, bz), 0.035, 0.035, 0.02, 6, hex(0x9aa0a4), METAL);
+  }
+  // Tủ điện trên tường đông cạnh máy phát, ống luồn lên trần.
+  mb.block(new Vec3(E - 0.18, 1.0, -16.1), new Vec3(0.18, 0.9, 0.6), hex(0x8a9096), METAL);
+  mb.block(new Vec3(E - 0.19, 1.62, -15.9), new Vec3(0.01, 0.08, 0.2), hex(0xd0b030), FLAT);
+  mb.tube(new Vec3(E - 0.06, 1.9, -15.8), new Vec3(E - 0.06, hh - 0.6, -15.8), 0.025, 0.025, 6, hex(0x6a7074), METAL);
+  mb.tube(new Vec3(E - 0.06, 1.0, -15.9), new Vec3(E - 0.06, 0.4, -15.9), 0.025, 0.025, 6, hex(0x6a7074), METAL);
+  // Thang nhôm dựa tường bắc giữa hai cột (chân trên sàn, đầu chạm tường).
+  {
+    const xl = 10.2, foot = N + 0.9, topY = 3.3;
+    for (const dx of [-0.22, 0.22]) mb.tube(new Vec3(xl + dx, 0.0, foot), new Vec3(xl + dx, topY, N + 0.03), 0.022, 0.022, 6, hex(0xb8bcc0), METAL);
+    for (let k = 1; k < 11; k++) { const t = k / 11; mb.tube(new Vec3(xl - 0.22, topY * t, foot + (N + 0.03 - foot) * t), new Vec3(xl + 0.22, topY * t, foot + (N + 0.03 - foot) * t), 0.014, 0.014, 5, hex(0xa0a4a8), METAL); }
+  }
+  // Cuộn ống trên giá treo tường bắc.
+  mb.block(new Vec3(7.3, 1.45, N), new Vec3(0.08, 0.1, 0.3), hex(0x3a3d40), METAL);
+  mb.push(m4_mul(m4_translate(new Vec3(7.34, 1.3, N + 0.3)), m4_rot_x(Math.PI / 2)));
+  mb.lathe(ZERO, [[0.28, -0.07], [0.32, 0.0], [0.28, 0.07], [0.2, 0.07], [0.17, 0.0], [0.2, -0.07]], 18, true, hex(0xb83a2a), FLAT);
+  mb.pop();
+  // Vạch sơn lối đi từ cửa kho vào giữa sảnh, ô sọc vàng quanh máy phát, vết dầu.
+  const yel = hex(0xd8b830);
+  for (const lx of [-3.1, -0.9]) mb.block(new Vec3(lx, 0.002, -13.5), new Vec3(0.08, 0.006, 7.9), yel, FLAT);
+  mb.block(new Vec3(-3.1, 0.002, -13.58), new Vec3(13.0, 0.006, 0.08), yel, FLAT);
+  const g = lay.GENERATOR_BOX;
+  for (let k = 0; k < 7; k++) mb.block(new Vec3(g[0] - 0.5 + k * 0.32, 0.002, g[3] + 0.45), new Vec3(0.16, 0.006, 0.08), k % 2 ? hex(0x1c1c1c) : yel, FLAT);
+  // Dây treo ba máng đèn từ vì kèo.
+  for (const [lx, lz] of [[0.0, -9.0], [8.0, -12.0], [12.0, -16.0]]) for (const dx of [-0.5, 0.5]) mb.tube(new Vec3(lx + dx, 5.63, lz), new Vec3(lx + dx, hh + 0.02, lz), 0.006, 0.006, 4, hex(0x202020), FLAT);
+}
+
+/** Phòng mở rộng (SF2 / SF3): không còn như đường hầm nhưng vẫn trống chỗ xây. Dải ốp chân tường sơn sẫm + nẹp gỗ ở 1 m,
+ * ô cửa sổ đóng ván ở tường trước (khớp cửa sổ ngoài mặt tiền, khe ván lọt sáng), ống nước chạy dọc tường sau có bát và
+ * hộp điện, vết ố loang trên tường, vài món góc phòng (thang gấp, chồng ván, xô sơn, tấm bạt).
+ * Giữa phòng để trống. Chỉ là hình. */
+function expansion_dress(mb, room, x0, x1, wl) {
+  const r = Rng.named('sfdress' + room);
+  const BZ = -5.0, FZ = 2.95, dark = shade(wl[0], 0.68), rail = hex(0x5a4632);
+  // ốp chân tường + nẹp (tường sau và tường trước)
+  for (const [z, dz] of [[BZ, 1], [FZ, -1]]) {
+    mb.block(new Vec3(x0, 0.12, dz > 0 ? z : z - 0.012), new Vec3(x1 - x0, 0.9, 0.012), dark, wl[1]);
+    mb.block(new Vec3(x0, 1.0, dz > 0 ? z : z - 0.03), new Vec3(x1 - x0, 0.06, 0.03), rail, WOOD);
+  }
+  if (room === 2) {
+    const ex = x1; // tường đông bên trong
+    mb.block(new Vec3(ex - 0.012, 0.12, BZ), new Vec3(0.012, 0.9, FZ - BZ), dark, wl[1]);
+    mb.block(new Vec3(ex - 0.03, 1.0, BZ), new Vec3(0.03, 0.06, FZ - BZ), rail, WOOD);
+  }
+  // cửa sổ đóng ván phía trong tường trước, đúng chỗ cửa sổ mặt tiền (x0 + 3 của mỗi phòng)
+  const wx = room === 1 ? 8.0 : 20.0;
+  mb.block(new Vec3(wx - 0.08, 0.86, FZ - 0.05), new Vec3(2.56, 0.08, 0.05), hex(0x3b3a36), WOOD);
+  mb.block(new Vec3(wx - 0.08, 2.2, FZ - 0.05), new Vec3(2.56, 0.08, 0.05), hex(0x3b3a36), WOOD);
+  for (const xx of [wx - 0.08, wx + 2.4]) mb.block(new Vec3(xx, 0.86, FZ - 0.05), new Vec3(0.08, 1.42, 0.05), hex(0x3b3a36), WOOD);
+  mb.block(new Vec3(wx, 0.94, FZ - 0.02), new Vec3(2.4, 1.26, 0.02), hex(0x1c2733), FLAT);
+  mb.emi = 0.6; // ánh ngày lọt qua khe ván
+  for (let k = 0; k < 3; k++) mb.block(new Vec3(wx + 0.05, 1.2 + k * 0.4, FZ - 0.025), new Vec3(2.3, 0.025, 0.005), hex(0xd8d0b0), FLAT);
+  mb.emi = 0.0;
+  for (let k = 0; k < 4; k++) {
+    mb.push(m4_mul(m4_translate(new Vec3(wx + 1.2, 1.05 + k * 0.4, FZ - 0.07)), m4_rot_z(r.range(-0.06, 0.06))));
+    mb.cube(ZERO, new Vec3(2.6, 0.3, 0.035), shade(hex(0x7a5a3a), r.range(0.7, 1.0)), WOOD);
+    mb.pop();
+  }
+  // ống nước dọc tường sau ở 2,7 m, bát giữ, khuỷu xuống sàn ở đầu phòng, hộp điện + ống luồn
+  const py = 2.7, pz = BZ + 0.09;
+  mb.tube(new Vec3(x0 + 0.3, py, pz), new Vec3(x1 - 0.3, py, pz), 0.045, 0.045, 8, hex(0x6a7074), METAL);
+  for (let xx = x0 + 0.8; xx < x1 - 0.3; xx += 1.6) mb.block(new Vec3(xx - 0.03, py - 0.06, BZ), new Vec3(0.06, 0.12, 0.1), hex(0x3a3d40), METAL);
+  mb.tube(new Vec3(x0 + 0.3, py, pz), new Vec3(x0 + 0.3, 0.0, pz), 0.045, 0.045, 8, hex(0x6a7074), METAL);
+  const bx = x0 + 2.2 + r.range(0, 1.5);
+  mb.block(new Vec3(bx, 1.35, BZ), new Vec3(0.4, 0.5, 0.12), hex(0x8a9096), METAL);
+  mb.tube(new Vec3(bx + 0.2, 1.85, BZ + 0.05), new Vec3(bx + 0.2, py - 0.05, BZ + 0.05), 0.018, 0.018, 6, hex(0x6a7074), METAL);
+  // vết ố loang trên tường sau (mảng sẫm mỏng sát tường)
+  for (let k = 0; k < 3; k++) {
+    const sx = x0 + 1.0 + r.range(0, x1 - x0 - 2.0), sy = r.range(1.3, 2.4), sw = r.range(0.5, 1.2);
+    mb.block(new Vec3(sx, sy, BZ), new Vec3(sw, sw * 0.6, 0.004), shade(wl[0], 0.82), wl[1]);
+  }
+  // góc phòng: thang gấp dựa tường (phòng 1), chồng ván + xô sơn (phòng 2), tấm bạt gấp
+  if (room === 1) {
+    const lx = x1 - 1.4, foot = BZ + 0.75; // >= 0.9 m from the open side to room 2
+    for (const dx of [-0.2, 0.2]) mb.tube(new Vec3(lx + dx, 0.0, foot), new Vec3(lx + dx, 1.9, BZ + 0.03), 0.02, 0.02, 6, hex(0xb8bcc0), METAL);
+    for (let k = 1; k < 6; k++) { const t = k / 6; mb.block(new Vec3(lx - 0.2, 1.9 * t - 0.015, foot + (BZ + 0.03 - foot) * t - 0.04), new Vec3(0.4, 0.03, 0.08), hex(0xa0a4a8), METAL); }
+  } else {
+    for (let k = 0; k < 5; k++) mb.block(new Vec3(x1 - 2.4, k * 0.04, BZ + 0.15 + (k % 2) * 0.05), new Vec3(2.2, 0.04, 0.22), shade(hex(0xc9a87c), r.range(0.75, 1.0)), WOOD);
+    for (const [dx, c] of [[0.0, 0xd0c8b0], [0.36, 0x3a6a9a]]) {
+      mb.cyl(new Vec3(x1 - 0.45 - dx, 0.0, FZ - 0.4), 0.15, 0.13, 0.34, 12, hex(c), METAL);
+      mb.tube(new Vec3(x1 - 0.6 - dx, 0.34, FZ - 0.4), new Vec3(x1 - 0.3 - dx, 0.34, FZ - 0.4), 0.006, 0.006, 4, hex(0x3a3d40), METAL);
+    }
+  }
+  mb.block(new Vec3(x1 - (room === 1 ? 1.6 : 2.7), 0.0, FZ - 1.0), new Vec3(1.1, 0.06, 0.75), hex(0x3a5a6a), CARDBOARD); // folded tarp, away from the open side
 }
 
 function build_shop(mb, glass, g) {
@@ -424,6 +595,10 @@ function build_shop(mb, glass, g) {
   } else {
     wall_z(mb, 2.95, 5.25, 0.0, 3.2, 5.0, 5.25, plaster, brick);
     wall_z(mb, -5.0, 2.95, 2.75, 3.2, 5.0, 5.25, plaster, plaster);
+    // the plank shelf's brackets were screwed to the wall that is now gone: three posts up to the header and a backing
+    // board carry them (no collider; the opening stays walkable around them)
+    for (const z of [-1.25, 0.5, 2.25]) mb.block(new Vec3(5.0, 0.0, z - 0.03), new Vec3(0.06, 2.75, 0.06), hex(0x5a4632), WOOD);
+    mb.block(new Vec3(5.0, 0.62, -1.7), new Vec3(0.035, 0.42, 4.4), hex(0x6a5236), WOOD);
   }
   // Tường tây (phòng ngủ, và phòng y tế khi đã mở).
   wall_z(mb, -5.25, bld.med_open ? 5.25 : lay.BEDROOM[3], 0.0, 3.2, lay.BEDROOM[0], bx0, bed_wall, brick);
@@ -512,6 +687,7 @@ function build_shop(mb, glass, g) {
     const skirt = hex(0x5a4632);
     mb.block(new Vec3(wx0, 0.0, -5.0), new Vec3(x1 - wx0, 0.12, 0.03), skirt, WOOD);
     mb.block(new Vec3(wx0, 0.0, 2.92), new Vec3(x1 - wx0, 0.12, 0.03), skirt, WOOD);
+    expansion_dress(mb, room, wx0, x1, wl);
   }
   mb.block(new Vec3(e[0], 3.2, e[1] - 0.1), new Vec3(e[2] - e[0] + 0.1, 0.25, e[3] - e[1] + 0.2), hex(0x4b4a45), CONCRETE);
   for (const x0 of [8.0, 14.5, 20.0]) {
@@ -537,6 +713,7 @@ function build_shop(mb, glass, g) {
     workbench(mb, bld.tiers[build.T_BENCH]);
     shredder(mb, bld.tiers[build.T_SHREDDER] >= 1);
     generator(mb, bld.gen_fixed);
+    warehouse_dress(mb, w, hh);
     // Giá kho dọc tường tây, pallet và thùng.
     for (let k = 0; k < 3; k++) {
       const z = -17.5 + k * 3.6;
