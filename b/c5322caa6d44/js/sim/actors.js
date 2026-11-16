@@ -767,6 +767,9 @@ export function detect_radius(hour) {
 }
 
 export function roam_cap(day, hour) {
+  // [ĐỀ XUẤT phiên 7] Ngày 2 là ngày đầu có zombie lang thang, người chơi mới chỉ có búa: đêm ngày 2 tối đa 3 con
+  // (bản gốc 5). Phiên 4-6 bot flow chết ở đêm ngày 2 nhiều lần vì nhiều con lọt vào quán lúc chạng vạng.
+  if (day === 2) return Math.min(roam_cap(3, hour), hour < 21.6 ? 2 : 3);
   if (day < 2 || hour < 9.6) {
     return 0;
   } else if (hour < 12.0) {

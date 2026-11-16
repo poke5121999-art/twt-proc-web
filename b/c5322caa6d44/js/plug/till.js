@@ -8,6 +8,9 @@
 // - a fake found: the alarm button glows and pulses until pressed, the paying robot's face screen shows fear, then
 //   pleading while it begs (Y/N), anger if it bolts.
 // View only: coins, drawer revenue, alarm outcome and the bots' pay[] export are the rules'. ?noplug=till turns it off.
+import * as THREE from '../../vendor/three.module.min.js';
+import { noMask } from '../mats.js';
+import * as models from '../sim/models.js';
 import * as world from '../sim/world.js';
 import * as player from '../sim/player.js';
 import * as lay from '../sim/lay.js';
@@ -36,6 +39,38 @@ export async function install(G) {
   const alarmNode = sg.spawn(one((mb) => { mb.emi = 3.0; mb.lathe(new Vec3(0, 0, 0), [[0.075, 0.0], [0.065, 0.012], [0.0, 0.016]], 16, false, hex(0xff3020), FLAT); mb.emi = 0; }), 'solid', { pos: new Vec3(player.ALARM.x + 0.1, player.ALARM.y + 0.05, player.ALARM.z + 0.2), shadow: false, visible: false });
   const drawerNode = sg.spawn(one(() => {}), 'solid', { pos: new Vec3(0, 0, 0), shadow: false });
   let drawerSig = '';
+  // value printed on each battery on the counter: canvas label on the side facing the seller, lit a little so it reads in the
+  // dim shop (one texture per denomination, a small pool of quads)
+  const labelTex = new Map();
+  const tex = (v) => {
+    if (labelTex.has(v)) return labelTex.get(v);
+    const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+    const x = c.getContext('2d');
+    x.fillStyle = '#f4f0e4'; x.fillRect(0, 0, 128, 64);
+    x.fillStyle = '#16181b'; x.fillRect(0, 0, 128, 6); x.fillRect(0, 58, 128, 6);
+    x.font = 'bold ' + (v >= 1000 ? 40 : 50) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#111';
+    x.fillText(String(v), 64, 34);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    const m = noMask(new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(1.6, 1.6, 1.6) }));
+    labelTex.set(v, m); return m;
+  };
+  const labelGeo = new THREE.PlaneGeometry(1, 1);
+  const labels = [];
+  const syncLabels = () => {
+    const pay = g.pay;
+    let n = 0;
+    if (pay) pay.coins.forEach((c, i) => {
+      if (c.done !== 0 || hidden.has(i)) return;
+      const L = models.battery_look(c.value), r = L.r * 1.5, h = L.h * 1.2, p = player.coin_pos(i);
+      let m = labels[n];
+      if (!m) { m = new THREE.Mesh(labelGeo, tex(c.value)); m.rotation.y = Math.PI; m.castShadow = false; G.scene.add(m); labels[n] = m; }
+      m.material = tex(c.value); m.visible = true;
+      m.scale.set(r * 1.7, h * 0.42, 1);
+      m.position.set(p.x, p.y + h * 0.3, p.z - r * 1.03 - 0.002);
+      n++;
+    });
+    for (let k = n; k < labels.length; k++) labels[k].visible = false;
+  };
   const flyers = [];
   const coinNode = (value, tell) => sg.spawn(one((mb) => world.battery_geo(mb, new Vec3(0, 0, 0), value, tell)), 'solid', { pos: new Vec3(0, -5, 0), shadow: false, dynamic: true });
   const bump = () => { g.pay_rev += 1; };
@@ -94,6 +129,7 @@ export async function install(G) {
         if (u >= 1) { f.node.despawn(); flyers.splice(k, 1); hidden.delete(f.i); play('tink', 0.3, f.b); drawerSig = ''; }
       }
     }
+    syncLabels();
     // tester lamp
     S.lamp = Math.max(0, S.lamp - dt);
     const lit = S.lamp > 0 ? S.lampCol : 0;

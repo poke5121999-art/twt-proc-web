@@ -685,7 +685,8 @@ const SKIN = 0xc68a5e;
 export const VM_OPTS = { arms: true };
 
 export function arm(mb, grip, elbow, palm, side) {
-  if (!VM_OPTS.arms) return;
+  // plug/hands.js draws its own robot hands at the same grips: record them on the mesh builder (view only)
+  if (!VM_OPTS.arms) { (mb.grips || (mb.grips = [])).push({ grip, elbow, palm, side }); return; }
   const { FLAT } = geom;
   const y = normalize_or(grip.sub(elbow), Y);
   const z = normalize_or(palm.sub(y.mul(palm.dot(y))), Z);

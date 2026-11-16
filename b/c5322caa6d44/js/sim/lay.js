@@ -160,6 +160,7 @@ export const WAKE_YAW = -f32(Math.PI / 2);
 export const WAKE_DROP = v(-6.4, 0.0, -3.8);
 /** Hộp các-tông trong phòng ngủ (gốc `CardboardBoxItemPrefab` (-9,4; -6,1)). */
 export const CARD_BOX = v(-8.3, 0.0, -3.1);
+export const BOX_PILE = v(-1.75, 0.0, 4.45);
 /** Góc đống 14 hộp thiếc; hàng xếp về phía -x (`TINS_STEP`), dãy lùi về +z. */
 export const TINS = v(-6.0, 0.0, -2.0);
 export const TINS_STEP = -0.42;
@@ -434,6 +435,7 @@ export function json() {
     ['bed_stand', BED_STAND],
     ['wake', WAKE],
     ['card_box', CARD_BOX],
+    ['box_pile', BOX_PILE],
     ['tins', TINS],
     ['start', START],
     ['skip_intro', SKIP_INTRO],
