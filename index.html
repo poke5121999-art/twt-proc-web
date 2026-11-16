@@ -9,7 +9,7 @@
 // Bộ thu lỗi đặt đầu trang: mọi lỗi console / lỗi không bắt đều vào window.__errors để bot và người chơi thấy.
 window.__errors = [];
 window.__t0 = performance.now();
-window.__build = 'b3aec6e3694e';
+window.__build = 'a570d60cbadc';
 (function () {
   var oe = console.error;
   console.error = function () {
@@ -20,8 +20,8 @@ window.__build = 'b3aec6e3694e';
   window.addEventListener('unhandledrejection', function (e) { window.__errors.push('rejection: ' + (e.reason && e.reason.message || e.reason)); });
 })();
 </script>
-<link rel="stylesheet" href="b/b3aec6e3694e/css/page.css?v=b3aec6e3694e">
-<link rel="stylesheet" href="b/b3aec6e3694e/css/hud.css?v=b3aec6e3694e">
+<link rel="stylesheet" href="b/a570d60cbadc/css/page.css?v=a570d60cbadc">
+<link rel="stylesheet" href="b/a570d60cbadc/css/hud.css?v=a570d60cbadc">
 </head>
 <body class="loading">
 <div id="twt-view"><canvas id="twt-canvas" tabindex="0"></canvas></div>
@@ -52,7 +52,7 @@ window.__build = 'b3aec6e3694e';
     <button id="go" disabled>Vào game</button>
     <pre id="fatal"></pre>
     <div class="foot">Kỹ thuật ánh sáng, hậu kỳ, súng, hiệu ứng và âm thanh port từ <b>Saltline</b> của Felix Rieseberg.
-      Bộ dựng nhân vật port từ <b>Lanternfall</b> của loktar00. three.js r170 (MIT). Bản <span id="buildid">b3aec6e3694e</span>.
+      Bộ dựng nhân vật port từ <b>Lanternfall</b> của loktar00. three.js r170 (MIT). Bản <span id="buildid">a570d60cbadc</span>.
       <a href="bevy/" id="oldlink">Bản Bevy cũ</a></div>
   </div>
 </div>
@@ -90,7 +90,7 @@ window.__build = 'b3aec6e3694e';
 // Phiên 8: nạp main.js sau khi service worker (sw.js: thử lại khi Pages trả 5xx / mất mạng) đã nắm trang, để cả lần tải
 // đầu các module cũng được thử lại. Không có service worker (hay ?nosw) thì nạp thẳng; chờ tối đa 2,5 s.
 (function () {
-  var src="b/b3aec6e3694e/js/main.js?v=b3aec6e3694e";
+  var src="b/a570d60cbadc/js/main.js?v=a570d60cbadc";
   function go() { if (window.__mainInjected) return; window.__mainInjected = 1; var s = document.createElement('script'); s.type = 'module'; s.src = src; document.body.appendChild(s); }
   var q = new URLSearchParams(location.search);
   if (!('serviceWorker' in navigator) || q.has('nosw')) return go();
