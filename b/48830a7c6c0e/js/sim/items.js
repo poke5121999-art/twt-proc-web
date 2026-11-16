@@ -74,6 +74,22 @@ export function heal_of(i) {
 }
 
 /** Món bày lên kệ bán được cho khách. */
+/** [phiên 7, chủ dự án: "hộp phải có ý nghĩa"] Hàng và vật liệu (thức ăn / hàng bày kệ, vật liệu chế tạo, hạt giống):
+ *  chỉ nhặt được vào hộp các-tông đang cầm; không có hộp thì cầm đúng một món trên tay. Vũ khí, đạn, thuốc, đồ nghề, tờ
+ *  công thức, đồ dựng vẫn vào ba lô. `?loot=bag` giữ luật cũ (mọi thứ vào ba lô). */
+export function box_only(i) {
+  if (game.loot_bag()) return false;
+  const t = CAT[i].ty;
+  if (gun(i) !== null || INFO[i].usage.k === 'Recipe') return false;
+  return t === 2 || t === 5 || t === 9;
+}
+
+/** Vật liệu chế tạo / hạt giống (catalog loại 2, 9): mang hộp vào quán thì cất vào kho (player.stow_materials). */
+export function is_material(i) {
+  const t = CAT[i].ty;
+  return (t === 2 || t === 9) && gun(i) === null && INFO[i].usage.k !== 'Recipe';
+}
+
 export function sellable(i) {
   return INFO[i].sell && CAT[i].value > 0;
 }

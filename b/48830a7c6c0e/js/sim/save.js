@@ -6,7 +6,7 @@
 // Port of src/save.rs (see three/PORT-CONTRACT.md). The text format is byte-compatible with the Rust build, so saves
 // written by the Bevy client under `twtproc.save.v2.<n>` load here and the other way round.
 
-import { trunc } from './vec.js';
+import { trunc, v3 } from './vec.js';
 import { store_del, store_get, store_set } from './web.js';
 import * as game from './game.js';
 import * as items from './items.js';
@@ -76,7 +76,7 @@ export function save_string(g) {
     g.caches_done,
     g.total_served,
     g.bed_door_hits,
-    g.props.filter((p) => p.kind.k === 'Item' && p.kind.a === game.TIN && !p.dead).length,
+    g.props.filter((p) => p.kind.k === 'Item' && p.kind.a === game.TIN && !p.dead && !p.loose).length,
     g.rude_spawned ? 1 : 0,
     g.xpv[0],
     g.xpv[1],
@@ -86,6 +86,7 @@ export function save_string(g) {
     g.forgiven_due ? 1 : 0,
     g.stock_sel,
   ];
+  const fixed = g.shelves.filter((s) => s.prop === 0);
   const shelf = (s) => s.slots.map((x) => String(x !== null ? x : -1)).join(',');
   const shelfn = (s) => s.counts.map((x) => String(x | 0)).join(',');
   const done = g.done.map((d) => (d ? 1 : 0));
@@ -99,16 +100,19 @@ export function save_string(g) {
     `core=${nums(core)}`,
     `prices=${sparse(g.prices, (i, p) => p === Math.max(items.ival(i), 1))}`,
     `inv=${sparse(g.inv, (_, n) => n === 0)}`,
-    `shelf0=${shelf(g.shelves[0])}`,
-    `shelf1=${shelf(g.shelves[1])}`,
-    `shelfn0=${shelfn(g.shelves[0])}`,
-    `shelfn1=${shelfn(g.shelves[1])}`,
+    // kệ cố định (prop 0): một kệ ván từ phiên 7 (hai kệ với ?shelves=2); kệ dựng thêm lưu trong `build`
+    `shelf0=${fixed[0] ? shelf(fixed[0]) : ''}`,
+    `shelf1=${fixed[1] ? shelf(fixed[1]) : ''}`,
+    `shelfn0=${fixed[0] ? shelfn(fixed[0]) : ''}`,
+    `shelfn1=${fixed[1] ? shelfn(fixed[1]) : ''}`,
     `done=${nums(done)}`,
     `caches=${nums(caches)}`,
     `gifts=${nums(gifts)}`,
     `lm=${nums(lm)}`,
     `lmhp=${nums(lmhp)}`,
     `learned=${nums(learned)}`,
+    // [phiên 7] món rơi trên sàn (đồ lục văng ra, món thả từ ba lô): món:x*100:z*100
+    `floor=${g.props.filter((p) => p.loose && !p.dead && p.kind.k === 'Item').map((p) => `${p.kind.a}:${Math.round(p.pos.x * 100)}:${Math.round(p.pos.z * 100)}`).join(',')}`,
     `skills=${skills.save(g)}`,
     `build=${build.save(g)}`,
     `combat=${combat.save(g)}`,
@@ -229,7 +233,7 @@ export function load(g, slot, prev) {
   for (const [i, n] of pairs('inv')) {
     g.inv[i] = n;
   }
-  for (let sh = 0; sh < 2; sh++) {
+  for (let sh = 0; sh < Math.min(2, g.shelves.filter((x) => x.prop === 0).length); sh++) {
     const vs = parse(field(s, sh === 0 ? 'shelf0' : 'shelf1')).slice(0, g.shelves[sh].slots.length);
     vs.forEach((v, k) => {
       g.shelves[sh].slots[k] = v >= 0 && v < N_ITEMS ? v : null;
@@ -266,7 +270,7 @@ export function load(g, slot, prev) {
     } else if (kd.k === 'Pile' && piles > 0) {
       piles -= 1;
       p.dead = true;
-    } else if (kd.k === 'Item' && tins > 0) {
+    } else if (kd.k === 'Item' && tins > 0 && !p.loose) {
       tins -= 1;
       p.dead = true;
     } else if (kd.k === 'Cache') {
@@ -276,6 +280,12 @@ export function load(g, slot, prev) {
       }
       cache_i += 1;
     }
+  }
+  for (const e of field(s, 'floor').split(',')) {
+    const [a, x, z] = e.split(':').map((v) => parse_i32(v));
+    if (a === null || a === undefined || x === null || z === null || a < 0 || a >= N_ITEMS) continue;
+    g.add_prop({ k: 'Item', a }, v3(x / 100, 0.0, z / 100), 0.0);
+    g.props[g.props.length - 1].loose = true;
   }
   combat.load(g, field(s, 'combat'));
   if (g.has_w(game.HAMMER) || g.done[game.Q_ORDER.indexOf('Hammer')]) {
