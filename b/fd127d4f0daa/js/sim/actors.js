@@ -1008,7 +1008,9 @@ function tick_zombies(g, fx, dt) {
       z.yaw = turn(z.yaw, yaw_to(to), dt * 8.0);
       if (z.cd <= 0.0) {
         z.cd = cooldown + g.rng.range(0.2, 0.33);
-        z.wind = 0.5;
+        // [ĐỀ XUẤT phiên 8] Hulk (cú cào 150, một cú hạ người chơi 100 máu) lấy đà 0,9 s thay vì 0,5 s: đòn to báo trước rõ, người chơi
+        // cẩn thận kịp lùi khỏi tầm 1,7 m. Raid đầu ngày 3 có một Hulk ở đợt cuối; bot flow thua raid đó khi Hulk áp sát (Pages 0e643223c199).
+        z.wind = z.kind === 'Hulk' ? 0.9 : 0.5;
       }
       continue;
     }
@@ -1197,7 +1199,8 @@ export function zombie_pose(z) {
   const pitch = -fall * fall * 1.45;
   const quat = q_mul(q_mul(q_y(z.yaw), q_z(sway)), q_x(pitch));
   // Vung tay: giơ cao lúc lấy đà rồi bổ xuống.
-  const reach = z.wind > 0.0 ? -2.6 + (0.5 - z.wind) * 3.2 : -1.35;
+  const w0 = z.kind === 'Hulk' ? 0.9 : 0.5; // thời gian lấy đà (phiên 8: Hulk 0,9 s)
+  const reach = z.wind > 0.0 ? -2.6 + (1.0 - z.wind / w0) * 1.6 : -1.35;
   // Dáng đi theo từng con: lết đều, khập khiễng (một chân bước ngắn), kéo lê một chân, chồm tới.
   const gait = z.kind === 'Base' || z.kind === 'Tumour' ? z.seed % 4 : 0;
   const mv = z.moving ? 1.0 : 0.0;

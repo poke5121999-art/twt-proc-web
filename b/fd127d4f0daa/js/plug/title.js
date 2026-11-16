@@ -21,6 +21,10 @@ const ICON = {
 };
 const CSS = `
 #hud .tl-menu { display: none; }
+/* phiên 8: trang tải (body.loading, nút #go "Vào game") còn hiện thì menu thẻ chưa nhận chuột: trước đây thẻ nằm đè nút #go, bấm
+   "Vào game" khi tải lại trang rơi vào thẻ (bot flow / day1loop / craft trên Pages a570d60cbadc kẹt 30 s) */
+body.loading #hud .tl-menu { visibility: hidden; pointer-events: none; }
+body.loading #hud .tl-menu .tl-card { pointer-events: none; }
 #hud [data-pk="Title"] .tl-menu { display: flex; flex-direction: column; gap: 0.45em; }
 #hud [data-pk="Title"] .hd-ptext { display: none; }
 #hud .tl-menu .tl-card { appearance: none; border: 0; margin: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; pointer-events: auto;
