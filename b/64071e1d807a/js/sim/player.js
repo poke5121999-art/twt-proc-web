@@ -142,7 +142,11 @@ export function prop_box(p) {
     case 'Reward': r = 0.5; h = 0.7; break;
     case 'Wire': r = 0.1; h = 0.1; break;
     case 'Corpse': r = 0.7; h = 0.4; break;
-    case 'Cache': r = 0.45; h = 0.8; break;
+    case 'Cache': {
+      // Đợt 13: đồ cao (tủ, tủ lạnh) nhắm được cả thân.
+      const sz = { 'Locker': [0.6, 1.8], 'Fridge': [0.45, 1.6], 'Cabinet': [0.4, 1.0], 'Tool chest': [0.45, 1.0], 'Supply crate': [0.55, 0.9], 'Safe': [0.35, 0.65] }[p.kind.a];
+      r = sz ? sz[0] : 0.45; h = sz ? sz[1] : 0.8; break;
+    }
     case 'Placed': r = 0.4; h = 1.0; break;
   }
   return [p.pos.add(v3(-r, 0.0, -r)), p.pos.add(v3(r, h, r))];
@@ -1015,6 +1019,8 @@ export function player_system(g, dt_raw, ctx) {
   }
 
   const [target, _hit] = find_target(g, eye, fwd);
+  // Phần nhìn (plug/loot.js) sáng viền chỗ lục đang nhắm.
+  g.look_id = target.k === 'Prop' ? target.a : 0;
   g.prompt = prompt_for(g, target);
   if ((g.prompt.length === 0 || g.prompt === 'Counter') && actors.medical_near(g) !== null) {
     g.prompt = '[Y] Give medicine   [N] Send away';

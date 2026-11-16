@@ -1023,6 +1023,41 @@ export function build_vm(g, key, main, off) {
   const v = v3;
   main.bevel = 0.008;
   off.bevel = 0.008;
+  if (key === VM_BROOM && !fp.VM_OPTS.arms) {
+    // [ĐỀ XUẤT, chủ dự án 2026-11-16: "đổi chổi thành máy hút bụi sci-fi"] Chỉ đổi hình; luật quét, nhịp, đầu hút bám đống
+    // bẩn y như chổi. Ống hút cứng dọc trục y, thân máy + bình chứa phát sáng ở trên, đầu hút bẹt có đèn ở dưới (y -1,2).
+    const shell = hex(0xe3b23c), dark = hex(0x2a2c33), chrome = hex(0xc6cad0), glow = hex(0x6fe8ff);
+    main.tube(v(0.0, -1.14, 0.0), v(0.0, 0.05, 0.0), 0.021, 0.019, 10, chrome, METAL);
+    for (const y of [-0.9, -0.6, -0.3]) main.cyl(v(0.0, y, 0.0), 0.026, 0.026, 0.025, 10, dark, METAL);
+    // thân máy: khối bo tròn quanh ống, bình chứa trong suốt phát sáng ở mặt trước, ốc vít, lỗ thoát khí
+    main.bevel = 0.02;
+    main.cube(v(0.0, 0.0, 0.035), v(0.13, 0.26, 0.11), shell, METAL);
+    main.bevel = 0.006;
+    main.cube(v(0.0, 0.0, 0.094), v(0.1, 0.2, 0.012), dark, METAL);
+    for (let k = 0; k < 4; k++) main.cube(v(0.0, -0.085 + k * 0.012, -0.022), v(0.09, 0.005, 0.006), dark, METAL);
+    main.emi = 1.6;
+    main.cyl(v(0.0, -0.075, 0.105), 0.032, 0.032, 0.15, 12, glow, FLAT);
+    main.emi = 0.0;
+    main.cyl(v(0.0, -0.085, 0.105), 0.036, 0.036, 0.014, 12, chrome, METAL);
+    main.cyl(v(0.0, 0.075, 0.105), 0.036, 0.036, 0.014, 12, chrome, METAL);
+    for (const [x, y] of [[-0.05, 0.11], [0.05, 0.11], [-0.05, -0.11], [0.05, -0.11]]) main.cyl(v(x, y, 0.09), 0.006, 0.006, 0.006, 6, chrome, METAL);
+    // rãnh cầm trên cùng
+    main.bevel = 0.012;
+    main.cube(v(0.0, 0.2, 0.0), v(0.05, 0.12, 0.05), dark, METAL);
+    main.cube(v(0.0, 0.27, 0.0), v(0.12, 0.035, 0.05), shell, METAL);
+    // đầu hút bẹt: vỏ vàng, mép cao su, dải đèn xanh phía trước, hai bánh xe, khớp xoay
+    main.bevel = 0.015;
+    main.cube(v(0.0, -1.205, 0.0), v(0.38, 0.06, 0.13), shell, METAL);
+    main.bevel = 0.004;
+    main.cube(v(0.0, -1.235, 0.0), v(0.39, 0.012, 0.14), hex(0x1c1c1f), FLAT);
+    main.emi = 2.2;
+    main.cube(v(0.0, -1.2, 0.068), v(0.3, 0.012, 0.006), glow, FLAT);
+    main.emi = 0.0;
+    for (const x of [-0.17, 0.17]) main.tube(v(x, -1.225, -0.05), v(x + Math.sign(x) * 0.02, -1.225, -0.05), 0.022, 0.022, 10, dark, METAL);
+    main.cyl(v(0.0, -1.185, 0.0), 0.04, 0.032, 0.05, 10, dark, METAL);
+    main.bevel = 0.008;
+    return;
+  }
   if (key === VM_BROOM) {
     // Chổi: cán gỗ dọc trục y, đầu chổi bẹt ở dưới, hai tay nắm cán.
     const wood = hex(0x8a6a42);

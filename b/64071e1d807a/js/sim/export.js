@@ -118,7 +118,7 @@ export function export_system(g, dt, ctx) {
     g.speed = Math.min(Math.max(Math.fround(sp), 0.1), 60.0);
   }
   const todo = g.todo().map((t) => `"${esc(t[1])}"`);
-  const props = g.props.filter((p) => !p.dead).map((p) => `{"id":${p.id},"k":"${kind_tag(p.kind)}","x":${rfix(p.pos.x, 2)},"z":${rfix(p.pos.z, 2)}}`);
+  const props = g.props.filter((p) => !p.dead).map((p) => `{"id":${p.id},"k":"${kind_tag(p.kind)}","x":${rfix(p.pos.x, 2)},"z":${rfix(p.pos.z, 2)}${p.kind.k === 'Cache' ? `,"n":"${esc(p.kind.a)}","c":${(p.kind.b || []).length}` : ''}}`);
   const zs = g.zombies.filter((z) => !z.dead).map((z) => {
     let kd;
     switch (z.kind) {
@@ -159,7 +159,7 @@ export function export_system(g, dt, ctx) {
     }
     saves = out.join(',');
   }
-  const extra = `"bag":{${bag.join(',')}},"bagRows":[${bag_rows}],"sk":${skills.export(g)},"bld":${build.export(g)},"cb":${combat.export(g)},"ev":${events.export(g)},"slot":${g.slot},"bagSel":${g.bag_sel},"hpMax":${rfix(g.hp_max, 0)},"xp":[${g.xpv[0]},${g.xpv[1]},${g.xpv[2]},${g.xpv[3]}],"staffSel":${g.staff_sel},"stockSel":"${esc(items.iname(g.stock_sel))}","saves":[${saves}]`;
+  const extra = `"bag":{${bag.join(',')}},"bagRows":[${bag_rows}],"sk":${skills.export(g)},"bld":${build.export(g)},"cb":${combat.export(g)},"ev":${events.export(g)},"slot":${g.slot},"bagSel":${g.bag_sel},"hpMax":${rfix(g.hp_max, 0)},"xp":[${g.xpv[0]},${g.xpv[1]},${g.xpv[2]},${g.xpv[3]}],"staffSel":${g.staff_sel},"stockSel":"${esc(items.iname(g.stock_sel))}","saves":[${saves}],"sales":[${(g.sales || []).join(',')}]`;
   const pay = g.pay !== null ? g.pay.coins.map((c) => `[${c.value},${c.checked ? 1 : 0},${c.checked && c.fake ? 1 : 0},${c.done}]`).join(',') : '';
   const pay_alarm = g.pay !== null ? g.pay.alarm : -1;
   const med = g.customers.filter((c) => c.goal.k === 'Medical' && !c.gone).length;

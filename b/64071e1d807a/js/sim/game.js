@@ -121,8 +121,10 @@ export const SHELF_COLS = 7;
 /// ba lô / hộp = một món lẻ trên một ô kệ. Bản này: một món trong ba lô / hộp là một THÙNG, xếp lên kệ thành
 /// `case_units()` món lẻ cùng loại; một ô kệ chồng tối đa `stack_max()` món lẻ (hai thùng). Khách lấy từng món lẻ, giá vẫn
 /// tính theo món lẻ, luật mua bán không đổi. `?stack=1` về đúng luật gốc; `?stack=N` = N món lẻ một thùng.
-export const CASE_UNITS = 4;
-export const STACK_CASES = 2;
+/// Đợt 13 (chủ dự án: "1 khách mua ít thôi"): khách chỉ mua 1-3 món lẻ nên một thùng hạ từ 4 xuống 2 món lẻ (không thì 14
+/// hộp thiếc ngày 1 = 56 món lẻ, đủ bán 4-5 ngày, lục đồ thành vô nghĩa); một ô vẫn chồng tối đa 8 món lẻ (4 thùng).
+export const CASE_UNITS = 2;
+export const STACK_CASES = 4;
 let STACK_Q = undefined;
 export function case_units() {
   if (STACK_Q === undefined) {
@@ -133,6 +135,25 @@ export function case_units() {
 }
 export function stack_max() {
   return case_units() === 1 ? 1 : case_units() * STACK_CASES;
+}
+/// `?stack=1` = luật gốc của mọi phần đã rời gốc (kệ chồng, giỏ khách, chỗ lục thêm, đầy lại chỗ lục).
+export function orig_rules() {
+  return case_units() === 1;
+}
+
+/// [ĐỀ XUẤT] Đợt 13, rời luật gốc có chủ ý (chủ dự án 2026-11-15: "1 khách mua ít thôi và có thể loot được nhiều vị trí
+/// hơn"). Bản gốc: khách nhặt tới khi giỏ đủ 70% sức chứa 6 (= 5 món) hoặc hết hứng. Bản này: lúc sinh ra mỗi khách rút
+/// một cỡ giỏ `want` theo `BASKET_W` (1 món 45%, 2 món 40%, 3 món 15%; trung bình 1,7), nhặt đủ thì ra quầy. Nhịp khách
+/// tới không đổi (luật gốc: 6-7 khách trong 13:00-19:00 ngày 1). `?basket=N` ép mọi khách N món; `?stack=1` về gốc.
+export const BASKET_W = [0.45, 0.40, 0.15];
+export const BASKET_ORIG = 0.7 * 6.0;
+export function basket_want(rng) {
+  if (orig_rules()) return BASKET_ORIG;
+  const q = parseInt(query('basket') || '', 10);
+  if (Number.isFinite(q) && q >= 1 && q <= 6) return q;
+  let x = rng.next();
+  for (let i = 0; i < BASKET_W.length; i++) { x -= BASKET_W[i]; if (x < 0) return i + 1; }
+  return BASKET_W.length;
 }
 
 /// Một kệ bày hàng: hai kệ cố định của ván mới, cộng các kệ người chơi dựng thêm (src/build.rs).
@@ -670,6 +691,55 @@ export function loot_roll(rng, lines, food_first) {
   return out;
 }
 
+/// [ĐỀ XUẤT] Đợt 13: bảng đồ theo loại chỗ lục (mỗi món là một thùng = `case_units()` món lẻ khi lên kệ). Dòng đầu luôn rút
+/// trong nhóm hàng bán được (đồ ăn / uống / thuốc), các dòng sau rút trong cả bảng nên phần còn lại là vật liệu, đạn, đồ
+/// nghề. Lượng nhỏ (1-3) vì khách giờ chỉ mua 1-3 món lẻ: tổng hàng một ngày lục được phải xấp xỉ sức mua, không ngập kho.
+/// [tên món, ít nhất, nhiều nhất, trọng số]
+export const SPOT_TABLES = {
+  bag: [['Unlabelled Tin', 1, 2, 1.0], ['Tinned Beans', 1, 2, 0.8], ['Tinned Fruit', 1, 1, 0.6], ['Beer', 1, 2, 0.6], ['Worn Cloth', 1, 2, 0.5], ['Tape', 1, 1, 0.3], ['Bandage', 1, 1, 0.25]],
+  backpack: [['Tinned Beans', 1, 1, 0.8], ['Unlabelled Tin', 1, 2, 0.8], ['Beer', 1, 1, 0.5], ['Bandage', 1, 1, 0.5], ['Tinned Tuna', 1, 1, 0.25], ['9mm Ammo', 4, 8, 0.3], ['Worn Cloth', 1, 1, 0.4]],
+  tools: [['Unlabelled Tin', 1, 1, 0.5], ['Beer', 1, 1, 0.4], ['Nails', 1, 3, 0.9], ['Tape', 1, 2, 0.7], ['Plank', 1, 2, 0.6], ['Metal Scraps', 1, 2, 0.6], ['Crowbar', 1, 1, 0.12]],
+  locker: [['Beer', 1, 2, 0.8], ['Tinned Fruit', 1, 1, 0.6], ['Bandage', 1, 1, 0.5], ['Painkillers', 1, 1, 0.15], ['Worn Cloth', 1, 2, 0.5], ['9mm Ammo', 4, 8, 0.3], ['Tape', 1, 1, 0.3], ['Baseball Bat', 1, 1, 0.06]],
+  fridge: [['Beer', 1, 3, 1.0], ['Tinned Fruit', 1, 2, 0.8], ['Good Meat', 1, 2, 0.6], ['Potato', 1, 2, 0.5], ['Wine', 1, 1, 0.1]],
+  cabinet: [['Tinned Beans', 1, 2, 0.8], ['Unlabelled Tin', 1, 2, 0.8], ['Bandage', 1, 1, 0.5], ['Painkillers', 1, 1, 0.2], ['Tape', 1, 1, 0.4], ['Nails', 1, 2, 0.4]],
+  bin: [['Unlabelled Tin', 1, 1, 0.8], ['Tinned Beans', 1, 1, 0.4], ['Beer', 1, 1, 0.4], ['Worn Cloth', 1, 2, 0.7], ['Metal Scraps', 1, 1, 0.5]],
+  ammo: [['Unlabelled Tin', 1, 2, 0.6], ['Tinned Tuna', 1, 1, 0.4], ['Bandage', 1, 1, 0.4], ['9mm Ammo', 6, 12, 0.8], ['Shotgun Shells', 4, 8, 0.5]],
+  medical: [['Bandage', 1, 2, 1.0], ['Painkillers', 1, 1, 0.35], ['Tinned Fruit', 1, 1, 0.4], ['Beer', 1, 1, 0.3]],
+  safe: [['Tinned Tuna', 1, 2, 0.6], ['Wine', 1, 1, 0.4], ['Painkillers', 1, 1, 0.5], ['Whisky', 1, 1, 0.2], ['9mm Ammo', 6, 12, 0.5]],
+  crate: [['Unlabelled Tin', 2, 3, 1.0], ['Tinned Beans', 1, 2, 0.7], ['Tinned Fruit', 1, 2, 0.6], ['Beer', 1, 2, 0.5], ['Plank', 1, 2, 0.6], ['Nails', 1, 3, 0.5]],
+};
+/// Số dòng lúc mở ván theo bảng: chỗ to 2 dòng, chỗ nhỏ 1 dòng (+ 40% thêm một dòng).
+const SPOT_LINES = { locker: 2, fridge: 2, crate: 2, tools: 2, safe: 2, cabinet: 2 };
+/// [ĐỀ XUẤT] Đầy lại mỗi sáng: chỗ đã lục có `SPOT_REFILL` cơ hội đầy lại (bản gốc 5%), 1 dòng (+ 40% dòng thứ hai). Chỗ
+/// chưa lục giữ nguyên đồ. Nên lục là vòng lặp mỗi ngày: sáng ra đi một vòng, chỗ nào sáng đèn là có đồ.
+export const SPOT_REFILL = 0.45;
+const SPOT_IDS = new Map();
+function spot_id(name) {
+  if (!SPOT_IDS.has(name)) { let id = -1; for (let i = 0; i < N_ITEMS; i++) if (items.iname(i) === name) { id = i; break; } SPOT_IDS.set(name, id); }
+  return SPOT_IDS.get(name);
+}
+export function spot_roll(rng, table, lines) {
+  const T = SPOT_TABLES[table] || SPOT_TABLES.bag;
+  const out = [], used = new Set();
+  for (let l = 0; l < lines; l++) {
+    const rows = T.map((r, i) => i).filter((i) => spot_id(T[i][0]) >= 0 && !used.has(i) && (l > 0 || LOOT_FOOD.concat(['Tinned Tuna', 'Good Meat', 'Potato', 'Wine', 'Whisky', 'Bandage']).includes(T[i][0])));
+    if (rows.length === 0) break;
+    let total = 0; for (const i of rows) total += T[i][3];
+    let x = rng.next() * total, pick = rows[rows.length - 1];
+    for (const i of rows) { x -= T[i][3]; if (x <= 0) { pick = i; break; } }
+    used.add(pick);
+    const n = rng.int(T[pick][1], T[pick][2]);
+    for (let k = 0; k < n; k++) out.push(spot_id(T[pick][0]));
+  }
+  return out;
+}
+/// Loại bảng của 8 chỗ lục gốc khi chạy luật Đợt 13.
+export const CACHE_TABLE = { 'Duffle bag': 'bag', 'Trolley': 'crate', 'Toolbox': 'tools', 'Crate': 'crate', 'Bin': 'bin', 'Glovebox': 'ammo', 'Medical bag': 'medical', 'Suitcase': 'bag' };
+export function spot_table(name, pos) {
+  if (!orig_rules()) for (const [n, p, , t] of lay.LOOT_SPOTS) if (n === name && Math.abs(p.x - pos.x) < 0.05 && Math.abs(p.z - pos.z) < 0.05) return t;
+  return CACHE_TABLE[name] || 'bag';
+}
+
 export class Game {
   constructor(seed) {
     const prices = new Array(N_ITEMS).fill(0);
@@ -854,6 +924,28 @@ export class Game {
     // theo bảng `loot_roll`. [ĐỀ XUẤT] (chủ dự án 2026-11-15: lục đồ "toàn material", hết hàng ngay ngày 1): năm chỗ còn lại
     // của bản này đầy sẵn theo ĐÚNG bảng đầy lại của bản gốc, dòng đầu luôn là hàng bán được (đồ hộp, bia, thuốc).
     const rep8 = (i, n) => Array.from({ length: n }, () => i);
+    if (!orig_rules()) {
+      // Đợt 13: ba chỗ đầy sẵn của bản gốc giữ đúng SỐ MÓN LẺ gốc (một thùng = 2 món lẻ): 2 thùng tin, 2 beans + 1 beer,
+      // 4 thùng beer; năm chỗ còn lại và mọi chỗ thêm rút theo bảng của loại chỗ.
+      const caches = [
+        ['Duffle bag', lay.CACHE_DUFFLE, rep8(TIN, 2), 0.0],
+        ['Trolley', lay.CACHE_TROLLEY, [BEANS, BEANS, BEER], 0.0],
+        ['Toolbox', lay.CACHE_TOOLBOX, spot_roll(this.rng, 'tools', 2), 0.0],
+        ['Crate', lay.CACHE_CRATE, spot_roll(this.rng, 'crate', 2), 0.0],
+        ['Bin', lay.CACHE_BIN, spot_roll(this.rng, 'bin', 1), 0.0],
+        ['Glovebox', lay.CACHE_GLOVEBOX, spot_roll(this.rng, 'ammo', 1), 0.0],
+        ['Medical bag', lay.CACHE_MEDBAG, [BANDAGE].concat(spot_roll(this.rng, 'medical', 1)), 0.0],
+        ['Suitcase', lay.CACHE_SUITCASE, rep8(BEER, 4), 0.0],
+      ];
+      for (const [name, p, , t] of lay.LOOT_SPOTS) {
+        const lines = SPOT_LINES[t] || (this.rng.chance(0.4) ? 2 : 1);
+        caches.push([name, p, spot_roll(this.rng, t, lines), lay.LOOT_SPOTS.find((r) => r[1] === p)[2]]);
+      }
+      for (const [name, p, its, yaw] of caches) {
+        this.add_prop(PropKind.Cache(name, its, false), p, yaw);
+      }
+      return;
+    }
     const caches = [
       ['Duffle bag', lay.CACHE_DUFFLE, rep8(TIN, 4)],
       ['Trolley', lay.CACHE_TROLLEY, [BEANS, BEANS, BEANS, BEER, BEER]],
@@ -1470,6 +1562,7 @@ export class Game {
       this.add_prop(PropKind.Crate([TIN, TIN, BEANS, FRUIT, CLOTH, NAILS, NAILS, WIRING, WIRING]), lay.DELIVERY2, -0.3);
     }
     this.scav = [false, false];
+    this.sales = [];
     // Chỗ lục đồ có 5% cơ hội đầy lại mỗi sáng.
     const refill = [];
     this.props.forEach((p, i) => {
@@ -1478,6 +1571,16 @@ export class Game {
       }
     });
     for (const i of refill) {
+      if (!orig_rules()) {
+        // [ĐỀ XUẤT] Đợt 13: đầy lại SPOT_REFILL mỗi sáng theo bảng của loại chỗ.
+        if (this.rng.chance(SPOT_REFILL)) {
+          const p = this.props[i], k = p.kind;
+          const its = spot_roll(this.rng, spot_table(k.a, p.pos), this.rng.chance(0.4) ? 2 : 1);
+          p.kind = PropKind.Cache(k.a, its, false);
+          p.dirty = true;
+        }
+        continue;
+      }
       if (this.rng.chance(0.05)) {
         // [GỐC] đầy lại: 1-2 dòng theo trọng số của bảng `refresh.possible`.
         const its = loot_roll(this.rng, this.rng.int(1, 2), false);

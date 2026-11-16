@@ -1208,27 +1208,54 @@ export function bat_geo(mb) {
   models.weapon(mb, true, false);
 }
 
+/** One battery standing at `p` (base): casing in the colour / size of its denomination (models.BATTERY_LOOK), a light
+ *  emissive strip so it reads in the dim shop, metal top terminal, and after testing a bright ring on top: green real,
+ *  red fake (`tell` 0 untested, 1 real, 2 fake). Shared with plug/till.js (tester, drawers). */
+export function battery_geo(mb, p, value, tell) {
+  const L = models.battery_look(value);
+  const r = L.r * 1.5, h = L.h * 1.2;
+  const old = mb.emi;
+  mb.cyl(p, r, r, h, 12, hex(L.col), METAL);
+  mb.cyl(p, r * 1.02, r * 1.02, h * 0.12, 12, hex(0x1e2124), METAL);
+  mb.emi = 0.7;
+  mb.cyl(p.add(Y.mul(h * 0.55)), r * 1.03, r * 1.03, h * 0.1, 12, shade(hex(L.col), 1.35), FLAT);
+  mb.emi = 0.0;
+  mb.cyl(p.add(Y.mul(h)), r * 0.45, r * 0.45, 0.01, 8, hex(0xd0d4d8), METAL);
+  if (value >= 1000) mb.cyl(p.add(Y.mul(h * 0.2)), r * 1.04, r * 1.04, h * 0.08, 12, hex(0x1e2124), METAL);
+  if (tell !== 0) {
+    mb.emi = 1.6;
+    mb.cyl(p.add(Y.mul(h * 0.86)), r * 1.06, r * 1.06, h * 0.12, 12, tell === 2 ? hex(0xff3a2a) : hex(0x3aff6a), FLAT);
+  }
+  mb.emi = old;
+}
+
+/** Where unit `k` of slot `s` stands on shelf `sh` (world point handed to item_geo) and its scale. The view's flying-can
+ *  animation (plug/stock.js) lands each can on exactly this spot. */
+export function shelf_unit_pos(sh, s, k) {
+  const p = sh.slot_pos(s).clone();
+  p.y -= 0.05;
+  if (G.stack_max() <= 1) return [p, 1.7];
+  // [ĐỀ XUẤT] Ô chồng nhiều món lẻ (G.case_units): xếp thành hàng 4 món dọc kệ, hàng trước đầy trước rồi lùi vào trong;
+  // mọi món đứng thẳng trên mặt ván (không chồng lơ lửng).
+  const per = 4, rows = Math.max(1, Math.ceil(G.stack_max() / per));
+  const dz = rows > 1 ? Math.min(0.2, 0.4 / (rows - 1)) : 0.0;
+  const col = k % per, row = Math.trunc(k / per);
+  const lx = (col - 1.5) * 0.14 + (row % 2) * 0.02;
+  const lz = (rows - 1) * dz * 0.5 - row * dz;
+  return [p.add(rot_y(sh.yaw, new Vec3(lx, 0.0, lz))), 1.25];
+}
+
 function shelf_mesh(sh) {
   const mb = new MB();
+  // View only: units still flying onto the shelf (plug/stock.js) are not drawn until they land.
+  const hide = globalThis.__twtShelfHide;
   for (let s = 0; s < sh.slots.length; s++) {
     const it = sh.slots[s];
     if (it !== null) {
-      const p = sh.slot_pos(s).clone();
-      p.y -= 0.05;
-      if (G.stack_max() <= 1) {
-        item_geo(mb, it, p, 1.7);
-        continue;
-      }
-      // [ĐỀ XUẤT] Ô chồng nhiều món lẻ (G.case_units): xếp thành hàng 4 món dọc kệ, hàng trước đầy trước rồi lùi vào trong;
-      // mọi món đứng thẳng trên mặt ván (không chồng lơ lửng).
-      const n = sh.units(s);
-      const per = 4, rows = Math.max(1, Math.ceil(G.stack_max() / per));
-      const dz = rows > 1 ? Math.min(0.2, 0.4 / (rows - 1)) : 0.0;
+      const n = Math.max(0, sh.units(s) - (hide ? hide(sh, s) : 0));
       for (let k = 0; k < n; k++) {
-        const col = k % per, row = Math.trunc(k / per);
-        const lx = (col - 1.5) * 0.14 + (row % 2) * 0.02;
-        const lz = (rows - 1) * dz * 0.5 - row * dz;
-        item_geo(mb, it, p.add(rot_y(sh.yaw, new Vec3(lx, 0.0, lz))), 1.25);
+        const [p, sc] = shelf_unit_pos(sh, s, k);
+        item_geo(mb, it, p, sc);
       }
     }
   }
@@ -1504,14 +1531,8 @@ export function sync_world(g, dt, ctx = {}) {
         if (c.done !== 0) {
           return;
         }
-        const p = player.coin_pos(i);
-        const h = 0.05 + Math.sqrt(Math.min(c.value, 20)) * 0.012;
-        mb.cyl(p, 0.032, 0.032, h, 8, hex(0x30353a), METAL);
-        mb.cyl(p.add(Y.mul(h)), 0.014, 0.014, 0.012, 6, hex(0xb9a54c), METAL);
-        mb.emi = c.checked ? 0.9 : 0.0;
-        const band = !c.checked ? hex(0xb08a2a) : c.fake ? hex(0xd8342a) : hex(0x3ad06a);
-        mb.cyl(p.add(Y.mul(h * 0.35)), 0.034, 0.034, h * 0.3, 8, band, FLAT);
-        mb.emi = 0.0;
+        if (globalThis.__twtCoinHide && globalThis.__twtCoinHide(i)) return;
+        battery_geo(mb, player.coin_pos(i), c.value, c.checked ? (c.fake ? 2 : 1) : 0);
       });
     }
     if (mb.is_empty()) {
