@@ -111,6 +111,87 @@ export function truck(mb, pos, yaw, col, flipped) {
   mb.pop();
 }
 
+/** Hai mái hiên sọc nhỏ trên hai cửa sổ mặt tiền (bản gốc: bạt sọc xanh / kem, diềm vỏ sò, audit-ref m01 / m08). Bạt 9 sọc
+ * võng giữa hai tay đỡ, sọc phai và bẩn dần ra mép trước, một vỏ sò rách mất, một vỏ sò lệch; má bên tam giác; khung ống
+ * sắt bắt vào tường bằng bát. Đáy diềm ~1,9 m, chỉ là hình (không collider), nên không chặn đường hay cửa. */
+function window_awnings(mb, trim, steel) {
+  const teal = hex(0x2d5866), cream = hex(0xcdc4a3);
+  const W = 2.36, D = 0.72, yTop = 2.56, drop = 0.44, zw = 5.252;
+  const hash = (a) => { const s = Math.sin(a * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  [[-4.0, -2.0], [2.0, 4.0]].forEach(([wx0, wx1], wi) => {
+    const cx = (wx0 + wx1) * 0.5, x0 = cx - W * 0.5;
+    const NU = 9, NT = 4;
+    // Mặt bạt: sọc võng nhiều ở giữa nhịp, mép trước võng nhẹ giữa hai tay đỡ.
+    const P = (u, t) => {
+      const span = Math.sin(Math.PI * u);
+      const y = yTop - drop * t - 0.07 * 4.0 * t * (1.0 - t) * (0.55 + 0.45 * span) - 0.035 * t * span;
+      return v(x0 + W * u, y, zw + D * t);
+    };
+    const torn = Math.floor(hash(wi * 7 + 1) * NU), skew = (torn + 3 + wi) % NU;
+    for (let i = 0; i < NU; i++) {
+      const base = i % 2 === 0 ? teal : cream;
+      const fade = 0.88 + 0.16 * hash(wi * 31 + i);
+      for (let j = 0; j < NT; j++) {
+        const u0 = i / NU, u1 = (i + 1) / NU, t0 = j / NT, t1 = (j + 1) / NT;
+        // Bụi và rêu bám dần ra mép trước (nước mưa chảy xuống).
+        const c = shade(base, fade * (1.0 - 0.16 * t1));
+        const a = P(u0, t0), b = P(u0, t1), cc = P(u1, t1), d = P(u1, t0);
+        mb.quad([a, b, cc, d], c, FLAT);
+        const dn = v(0.0, -0.012, 0.0);
+        mb.quad([a.add(dn), d.add(dn), cc.add(dn), b.add(dn)], shade(base, 0.45 * fade), FLAT);
+      }
+      // Diềm vỏ sò dưới mép trước: dải 10 cm + nửa đĩa; một vỏ sò rách mất, một vỏ sò xoắn lệch.
+      const ua = i / NU, ub = (i + 1) / NU;
+      const pa = P(ua, 1.0), pb = P(ub, 1.0);
+      const w = pb.x - pa.x, mid = pa.add(pb).mul(0.5);
+      const col = shade(base, fade * 0.82);
+      const back = shade(base, 0.5 * fade);
+      const tilt = i === skew ? 0.05 : 0.0;
+      const hang = i === torn ? 0.045 : 0.1;
+      const z = pa.z + 0.004;
+      const tl = v(pa.x, pa.y, z), tr = v(pb.x, pb.y, z);
+      const bl = v(pa.x, pa.y - hang, z + tilt), br = v(pb.x, pb.y - hang, z + tilt);
+      mb.quad([bl, br, tr, tl], col, FLAT);
+      mb.quad([tl, tr, br, bl], back, FLAT);
+      if (i !== torn) {
+        const ctr = v(mid.x, (bl.y + br.y) * 0.5, z + tilt);
+        const n = 6, r = w * 0.5;
+        for (let k = 0; k < n; k++) {
+          const a0 = Math.PI + (k / n) * Math.PI, a1 = Math.PI + ((k + 1) / n) * Math.PI;
+          const q0 = v(ctr.x + Math.cos(a0) * r, ctr.y + Math.sin(a0) * r * 0.62, z + tilt);
+          const q1 = v(ctr.x + Math.cos(a1) * r, ctr.y + Math.sin(a1) * r * 0.62, z + tilt);
+          mb.tri([ctr, q0, q1], col, FLAT);
+          mb.tri([ctr, q1, q0], back, FLAT);
+        }
+      }
+    }
+    // Má bên tam giác (kem, viền xanh).
+    for (const u of [0.0, 1.0]) {
+      const a = P(u, 0.0), b = P(u, 1.0);
+      const lo = v(b.x, b.y - 0.1, b.z), wl = v(a.x, a.y - 0.12, a.z);
+      const sx = u === 0.0 ? -0.004 : 0.004;
+      const off = v(sx, 0.0, 0.0);
+      const outer = [wl.add(off), lo.add(off), b.add(off), a.add(off)], inner = [a.sub(off), b.sub(off), lo.sub(off), wl.sub(off)];
+      if (u === 0.0) { mb.quad(outer, shade(cream, 0.86), FLAT); mb.quad(inner, shade(cream, 0.5), FLAT); }
+      else { mb.quad([outer[3], outer[2], outer[1], outer[0]], shade(cream, 0.86), FLAT); mb.quad([inner[3], inner[2], inner[1], inner[0]], shade(cream, 0.5), FLAT); }
+    }
+    // Khung: thanh trên tường, thanh trước dưới mép bạt, hai tay đỡ chéo, bát bắt tường.
+    const rust = hex(0x6a4a34);
+    mb.tube(v(x0 - 0.03, yTop - 0.02, zw + 0.02), v(x0 + W + 0.03, yTop - 0.02, zw + 0.02), 0.018, 0.018, 6, steel, METAL);
+    const f0 = P(0.0, 1.0), f1 = P(1.0, 1.0);
+    const fb = (u) => { const p = P(u, 1.0); return v(p.x, p.y - 0.018, p.z - 0.01); };
+    for (let k = 0; k < 4; k++) mb.tube(fb(k / 4), fb((k + 1) / 4), 0.016, 0.016, 6, k === 1 ? rust : steel, METAL);
+    for (const p of [f0, f1]) {
+      const w0 = v(p.x, yTop - 0.5, zw + 0.01);
+      mb.tube(w0, v(p.x, p.y - 0.02, p.z - 0.01), 0.014, 0.014, 6, steel, METAL);
+      mb.cube(v(p.x, yTop - 0.5, zw + 0.012), v(0.07, 0.1, 0.024), trim, METAL);
+      mb.cube(v(p.x, yTop - 0.02, zw + 0.012), v(0.07, 0.08, 0.024), trim, METAL);
+    }
+    // Bậu cửa sổ bê tông ngoài tường, mẻ một góc.
+    mb.block(v(wx0 - 0.1, 0.9, 5.25), v(wx1 - wx0 + 0.2 - (wi === 0 ? 0.0 : 0.12), 0.06, 0.11), hex(0x8f8b82), CONCRETE);
+  });
+}
+
 /** Chi tiết mặt tiền: khung cửa sổ, đầu đinh trên ván, mái hiên võng có diềm và thanh chống, khung biển, máng xối,
  * cục nóng có quạt, dây điện kéo từ cột. */
 export function facade(mb) {
@@ -131,6 +212,7 @@ export function facade(mb) {
       }
     }
   }
+  window_awnings(mb, trim, steel);
   // Mái hiên: 6 dải bạt võng giữa tường và thanh trước, diềm răng cưa, thanh chống chéo.
   const z0 = 5.25, z1 = 6.9;
   const sag = (t) => 2.72 - 0.1 * t - 0.09 * 4.0 * t * (1.0 - t);
@@ -297,19 +379,25 @@ export function counter(mb) {
   mb.bevel = old;
 }
 
-/** Hai kệ "Flimsy Wooden Shelf" bắt vào tường như bản gốc (clip 01 680 s, clip 04 28:30-29:20): ván gỗ sáng, mòn, không cột
- *  đứng, không lưng kệ; mỗi tầng một tấm ván dày 4 cm đỡ bằng ke sắt chữ L bắt vít vào tường, mép trước có nẹp mỏng (chỗ
- *  treo thẻ giá). [ĐỀ XUẤT] Bản gốc là một tấm ván lưới 7 x 3 ô; bản này giữ ba tầng (luật ô kệ, khách, bot dựa trên tầng). */
-export function shelves(mb) {
+/** Kệ cố định "Flimsy Wooden Shelf" bắt vào tường như bản gốc (ảnh ngày 2 của chủ dự án, clip 01 680 s, clip 04 28:30):
+ *  một tấm ván gỗ sáng ngang ngực (mặt ván y lay.PLANK_TOP), 7 ô ngang x 3 ô sâu trên cùng tấm ván, ke sắt chữ L bắt vít vào
+ *  tường, thanh nẹp treo thẻ giá dưới mép trước. `?shelves=2`: hai kệ ván ba tầng của bản trước (cũng bắt tường). */
+export function shelves(mb, fixed) {
   const SHELF_Z0 = lay.SHELF_Z0, SLOT_W = lay.SLOT_W;
-  const wood = hex(0xa8865e), iron = hex(0x3a3d40);
+  const wood = hex(0xa8865e), iron = hex(0x3a3d40), pale = hex(0xc9a87c);
   const L = 7 * SLOT_W, zc = SHELF_Z0 + L * 0.5;
-  for (const [x, , face] of lay.SHELVES) {
-    const xf = x + face * 0.25, xw = x - face * 0.447; // mép trước, mặt tường (tường trong ở x ±5)
-    for (let l = 0; l < 3; l++) {
+  const list = fixed && fixed.length ? fixed : [];
+  for (const sh of list) {
+    const face = Math.round(Math.sin(sh.yaw)) || 1; // +z riêng của kệ trên trục x thế giới (rot_y)
+    const x = sh.pos.x;
+    const xw = x - face * 0.447; // mặt tường (tường trong ở x ±5)
+    const levels = sh.plank ? 1 : 3;
+    const xf = x + face * (sh.plank ? lay.PLANK_FRONT : 0.25);
+    const d = Math.abs(xf - xw), half = d * 0.5;
+    if (sh.plank) { plank(mb, sh, face, xw, xf, zc, L, pale, iron); continue; }
+    for (let l = 0; l < levels; l++) {
       const y = 0.43 + l * 0.5;
-      // ván: hai tấm ghép dọc, màu lệch nhau, cạnh sẫm
-      const d = Math.abs(xf - xw), half = d * 0.5;
+      // ván: hai tấm ghép dọc, màu lệch nhau, cạnh sẫm; nẹp mép trước
       for (let b = 0; b < 2; b++) {
         const bx = xw + face * (half * 0.5 + b * half);
         mb.cube(v(bx, y, zc), v(half - 0.004, 0.04, L + 0.1), shade(wood, 0.9 + 0.12 * ((b + l) % 2)), WOOD);
@@ -318,14 +406,37 @@ export function shelves(mb) {
       // ke sắt chữ L: cánh đứng trên tường, cánh ngang dưới ván, thanh chéo, hai vít
       for (const k of [0.35, 2.1, 3.85]) {
         const z = SHELF_Z0 + k;
-        mb.cube(v(xw + face * 0.008, y - 0.13, z), v(0.016, 0.26, 0.035), iron, METAL);
+        const arm = sh.plank ? 0.34 : 0.26;
+        mb.cube(v(xw + face * 0.008, y - arm * 0.5, z), v(0.016, arm, 0.035), iron, METAL);
         mb.cube(v(xw + face * (d * 0.36), y - 0.028, z), v(d * 0.7, 0.016, 0.035), iron, METAL);
-        mb.push(m4_mul(m4_translate(v(xw + face * (d * 0.19), y - 0.13, z)), m4_rot_z(face * 0.95)));
-        mb.cube(ZERO, v(0.26, 0.012, 0.025), iron, METAL);
+        mb.push(m4_mul(m4_translate(v(xw + face * (d * 0.22), y - arm * 0.5, z)), m4_rot_z(face * 0.95)));
+        mb.cube(ZERO, v(arm * 1.15, 0.012, 0.025), iron, METAL);
         mb.pop();
-        for (const dy of [-0.06, -0.2]) mb.cyl(v(xw + face * 0.018, y + dy, z), 0.008, 0.008, 0.008, 6, hex(0x8a8f94), METAL);
+        for (const dy of [-0.06, -arm + 0.06]) mb.cyl(v(xw + face * 0.018, y + dy, z), 0.008, 0.008, 0.008, 6, hex(0x8a8f94), METAL);
       }
     }
+  }
+}
+
+/** Kệ ván mỏng như gốc (ảnh chủ dự án images/24.png): một tấm ván gỗ sáng dày lay.PLANK_T, vát nhẹ, ke chữ L mảnh; không nẹp,
+ *  không thanh treo, thẻ giá một hàng dưới mép trước (plug/pricetag.js). */
+function plank(mb, sh, face, xw, xf, zc, L, pale, iron) {
+  const T = lay.PLANK_T, y = lay.PLANK_TOP - T * 0.5, d = Math.abs(xf - xw);
+  const old = mb.bevel; mb.bevel = 0.004;
+  mb.cube(v((xw + xf) * 0.5, y, zc), v(d - 0.004, T, L + 0.1), pale, WOOD);
+  mb.bevel = old;
+  // vân ván: hai đường rãnh mảnh dọc mặt trên, sẫm hơn chút
+  for (const t of [0.34, 0.68]) mb.cube(v(xw + face * d * t, lay.PLANK_TOP + 0.0004, zc), v(0.004, 0.001, L + 0.08), shade(pale, 0.82), WOOD);
+  // ke sắt chữ L mảnh: cánh đứng trên tường, cánh ngang sát dưới ván, thanh chéo, hai vít
+  const arm = 0.2;
+  for (const k of [0.35, 2.1, 3.85]) {
+    const z = lay.SHELF_Z0 + k, yb = y - T * 0.5 - 0.004;
+    mb.cube(v(xw + face * 0.005, yb - arm * 0.5, z), v(0.01, arm, 0.024), iron, METAL);
+    mb.cube(v(xw + face * (d * 0.36), yb, z), v(d * 0.7, 0.008, 0.024), iron, METAL);
+    mb.push(m4_mul(m4_translate(v(xw + face * 0.099, yb - 0.082, z)), m4_rot_z(face * 0.709)));
+    mb.cube(ZERO, v(0.24, 0.007, 0.016), iron, METAL);
+    mb.pop();
+    for (const dy of [-0.04, -arm + 0.04]) mb.cyl(v(xw + face * 0.011, yb + dy, z), 0.006, 0.006, 0.005, 6, hex(0x8a8f94), METAL);
   }
 }
 

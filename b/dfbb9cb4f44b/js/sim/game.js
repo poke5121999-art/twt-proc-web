@@ -143,6 +143,10 @@ export function stack_max() {
 /// clip 02 Zanzibar 21:20-22:00 44 -> 62). Món nằm trên đất nhặt từng món: cầm hộp các-tông thì vào hộp ("Carry", clip 04
 /// 28:37-28:47, thanh 0/80 -> 30/80 -> 45/80), không cầm hộp thì vào ba lô như món rời có sẵn. `?loot=bag` = bản cũ (mọi
 /// món vào thẳng ba lô).
+/// `?shelves=2`: hai kệ ba tầng của bản trước phiên 7 (mặc định: một kệ ván bắt tường).
+export function two_shelves() {
+  return query('shelves') === '2';
+}
 export function loot_bag() {
   return query('loot') === 'bag';
 }
@@ -181,6 +185,8 @@ export class Shelf {
     this.ent = null;
     /// id của vật dựng (Prop) sinh ra kệ này; 0 = kệ cố định.
     this.prop = prop;
+    /// Kệ ván bắt tường: tầng = hàng từ trước ra sau trên một tấm ván (lay.PLANK_*).
+    this.plank = false;
   }
   static new(pos, yaw, cols, levels, prop) {
     return new Shelf(pos, yaw, cols, levels, prop);
@@ -192,6 +198,7 @@ export class Shelf {
   slot_pos(slot) {
     const col = slot % this.cols;
     const lvl = Math.trunc(slot / this.cols);
+    if (this.plank) return this.pos.add(rot_y(this.yaw, v3((col + 0.5 - this.cols * 0.5) * lay.SLOT_W, lay.PLANK_TOP + 0.05, lay.PLANK_ROWS[Math.min(lvl, 2)])));
     return this.pos.add(rot_y(this.yaw, v3((col + 0.5 - this.cols * 0.5) * lay.SLOT_W, 0.5 + lvl * 0.5, 0.0)));
   }
   /// Chỗ khách (hoặc bot) đứng trước ô `slot`.
@@ -774,10 +781,13 @@ export class Game {
     this.hour_mark = -1;
     this.prices = prices;
     this.inv = new Array(N_ITEMS).fill(0);
-    this.shelves = [
+    // [phiên 7] Một kệ ván bắt tường đông lúc mở ván (ảnh bản gốc ngày 2 của chủ dự án); kệ thêm thì chế tạo / dựng.
+    // `?shelves=2` giữ hai kệ ba tầng cũ.
+    this.shelves = two_shelves() ? [
       new Shelf(v3(lay.SHELVES[0][0], 0.0, lay.SHELF_Z0 + 3.5 * lay.SLOT_W), Math.PI / 2, SHELF_COLS, 3, 0),
       new Shelf(v3(lay.SHELVES[1][0], 0.0, lay.SHELF_Z0 + 3.5 * lay.SLOT_W), -Math.PI / 2, SHELF_COLS, 3, 0),
-    ];
+    ] : [new Shelf(v3(lay.SHELVES[1][0], 0.0, lay.SHELF_Z0 + 3.5 * lay.SLOT_W), -Math.PI / 2, SHELF_COLS, 3, 0)];
+    if (this.shelves.length === 1) this.shelves[0].plank = true;
     this.hp = 100.0;
     this.hp_max = 100.0;
     this.since_hit = 99.0;

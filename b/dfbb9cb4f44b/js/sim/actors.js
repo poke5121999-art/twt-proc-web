@@ -988,6 +988,8 @@ function tick_zombies(g, fx, dt) {
         z.cd = cooldown;
         g.door.hp -= 25.0;
         g.play('bang', 0.8);
+        // phiên 8: người chơi trong quán biết có zombie ngoài cửa trước khi mở
+        if (game.Game.in_shop(player) && g.notice_t <= 0.0 && !g.raid.active) g.say('Zombies are banging on the front door!');
         g.fxq.push([fxs.FX_DEBRIS, v3(clamp(z.pos.x, lay.DOOR_BOX[0] + 0.2, lay.DOOR_BOX[2] - 0.2), 1.2, lay.DOOR_BOX[3] + 0.05)]);
         if (g.door.hp <= 0.0) {
           g.door.hp = 0.0;

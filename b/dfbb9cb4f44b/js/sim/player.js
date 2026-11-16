@@ -186,8 +186,14 @@ export function find_target(g, o, d) {
     test(Target.Door(), v(db[0], 0.0, db[1]), v(db[2], 2.3, db[3]));
   } else {
     // Hai cánh đang mở vào trong, áp sát hai bên khung cửa.
-    test(Target.Door(), v(db[0] - 0.2, 0.0, db[1] - 0.95), v(db[0] + 0.02, 2.3, db[1] + 0.1));
-    test(Target.Door(), v(db[2] - 0.02, 0.0, db[1] - 0.95), v(db[2] + 0.2, 2.3, db[1] + 0.1));
+    // Phiên 8 (nguyên nhân "công tắc 13:00 phải bấm E hai lần", đo bằng tools/switch50.cjs + nhật ký phím E): cánh phải mở
+    // nằm sát ngay cạnh công tắc (x 0,98-1,2 so với công tắc x 1,5-1,96). Đứng gần cửa nhắm công tắc thì tia trúng cánh cửa
+    // trước (hay mắt nằm hẳn trong hộp cánh, khoảng cách 0), E đầu đóng cửa, cửa đóng rồi E sau mới trúng công tắc.
+    // Nay: tia trúng công tắc thì công tắc thắng cánh cửa đang mở; mắt nằm trong hộp cánh thì không tính cánh đó.
+    const sw = best[0].k === 'Switch' ? best : null;
+    const leaf = (mn, mx) => { const dd = ray_box(o, d, mn, mx); if (dd !== null && dd > 0.0 && dd < best[1] && sw === null) best = [Target.Door(), dd, o.add(d.mul(dd))]; };
+    leaf(v(db[0] - 0.2, 0.0, db[1] - 0.95), v(db[0] + 0.02, 2.3, db[1] + 0.1));
+    leaf(v(db[2] - 0.02, 0.0, db[1] - 0.95), v(db[2] + 0.2, 2.3, db[1] + 0.1));
   }
   if (g.bed_door_hits < 3) {
     const bb = lay.BED_DOOR_BOX;
@@ -199,6 +205,12 @@ export function find_target(g, o, d) {
     const sn = Math.sin(sh.yaw), cs = Math.cos(sh.yaw);
     const ex = Math.abs(cs) * hl + Math.abs(sn) * 0.32, ez = Math.abs(sn) * hl + Math.abs(cs) * 0.32;
     const top = 0.5 + trunc(sh.slots.length / sh.cols) * 0.5;
+    if (sh.plank) {
+      // kệ ván: hộp từ dưới ván tới trên hàng hoá, sâu từ tường tới mép trước
+      const ex2 = Math.abs(cs) * hl + Math.abs(sn) * 0.4, ez2 = Math.abs(sn) * hl + Math.abs(cs) * 0.4;
+      test(Target.Shelf(s, 0), v(sh.pos.x - ex2, lay.PLANK_TOP - 0.25, sh.pos.z - ez2), v(sh.pos.x + ex2, lay.PLANK_TOP + 0.3, sh.pos.z + ez2));
+      return;
+    }
     test(Target.Shelf(s, 0), v(sh.pos.x - ex, 0.3, sh.pos.z - ez), v(sh.pos.x + ex, top, sh.pos.z + ez));
   });
   const hc = actors.head_customer(g);
@@ -233,16 +245,23 @@ export function find_target(g, o, d) {
   if (best[0].k === 'Shelf') {
     const s = best[0].a;
     const sh = g.shelves[s];
-    const local = rot_neg_y(sh.yaw, best[2].sub(sh.pos));
-    const col = clamp(trunc(Math.floor(local.x / lay.SLOT_W + sh.cols * 0.5)), 0, sh.cols - 1);
+    let local = rot_neg_y(sh.yaw, best[2].sub(sh.pos));
     const levels = trunc(sh.slots.length / sh.cols);
-    const lvl = clamp(trunc(Math.floor((best[2].y - 0.45) / 0.5)), 0, levels - 1);
+    let lvl;
+    if (sh.plank) {
+      // ô = chỗ tia nhắm cắt mặt ván (hàng hoá đứng trên ván): cột theo x, hàng theo độ sâu
+      const yb = lay.PLANK_TOP + 0.04;
+      if (d.y < -1e-4 && o.y > yb) local = rot_neg_y(sh.yaw, o.add(d.mul((yb - o.y) / d.y)).sub(sh.pos));
+      lvl = clamp(Math.round((lay.PLANK_ROWS[0] - local.z) / (lay.PLANK_ROWS[0] - lay.PLANK_ROWS[1])), 0, levels - 1);
+    } else lvl = clamp(trunc(Math.floor((best[2].y - 0.45) / 0.5)), 0, levels - 1);
+    const col = clamp(trunc(Math.floor(local.x / lay.SLOT_W + sh.cols * 0.5)), 0, sh.cols - 1);
     best[0] = Target.Shelf(s, lvl * sh.cols + col);
     // Thẻ giá trên mép trước các ô có hàng: nhắm trúng thẻ thì đích là thẻ (kể cả khi hộp kệ, nhô ra trước thẻ, bị trúng trước).
     const lo = rot_neg_y(sh.yaw, o.sub(sh.pos)), ld = rot_neg_y(sh.yaw, d);
     let bt = null, bd = Math.min(REACH, best[1] + 0.25);
     for (let k = 0; k < sh.slots.length; k++) {
       if (sh.slots[k] === null) continue;
+      if (sh.plank && plank_tag_slot(sh, k % sh.cols) !== k) continue;
       const [mn, mx] = tag_box(sh, k);
       const dist = ray_box(lo, ld, mn, mx);
       if (dist !== null && dist < bd) { bd = dist; bt = k; }
@@ -251,9 +270,24 @@ export function find_target(g, o, d) {
   }
   return [best[0], best[2]];
 }
+/** Tâm thẻ giá của kệ ván (y): một hàng thẻ treo dưới mép trước tấm ván. */
+export function tag_y() {
+  return lay.PLANK_TAG_Y;
+}
+/** Kệ ván: mỗi cột một thẻ, của món đứng trước nhất trong cột (ô hàng trước nếu có hàng, không thì hàng sau đó); null khi cột trống. */
+export function plank_tag_slot(sh, col) {
+  const levels = trunc(sh.slots.length / sh.cols);
+  for (let l = 0; l < levels; l++) if (sh.slots[l * sh.cols + col] !== null) return l * sh.cols + col;
+  return null;
+}
 /** Hộp nhắm của thẻ giá ô `k` trong khung riêng của kệ (+z mặt trước; mép trước tầng l ở y 0,435..0,485 + 0,5 l, z 0,25). */
 export function tag_box(sh, k) {
   const col = k % sh.cols, lvl = trunc(k / sh.cols);
+  if (sh.plank) {
+    // kệ ván: một thẻ mỗi cột treo dưới mép trước (hơi ngả ra sau cho dễ đọc từ chỗ đứng)
+    const x = (col + 0.5 - sh.cols * 0.5) * lay.SLOT_W, y = tag_y();
+    return [v3(x - 0.13, y - 0.04, lay.PLANK_FRONT - 0.02), v3(x + 0.13, y + 0.04, lay.PLANK_FRONT + 0.035)];
+  }
   const x = (col + 0.5 - sh.cols * 0.5) * lay.SLOT_W, y = 0.41 + lvl * 0.5;
   return [v3(x - 0.14, y - 0.055, 0.2), v3(x + 0.14, y + 0.055, 0.3)];
 }
@@ -727,6 +761,24 @@ export function press_e(g, t) {
       }
       g.door.open = !g.door.open;
       g.play('door', 0.6);
+      // [ĐỀ XUẤT phiên 8] Mở cửa đúng lúc zombie đang đập cửa: cánh cửa hất chúng lùi 0,9 m và choáng 1,2 s, đủ để người chơi
+      // đóng lại hay đánh trước. Trước đây hai con đứng sát cửa cào ngay khi mở (100 máu mất trong ~6 s, bot flow chết 1 / 4).
+      if (g.door.open) {
+        let n = 0;
+        for (const z of g.zombies) {
+          if (z.dead || z.hp <= 0.0 || combat.zkind_boss(z.kind) || z.kind === 'Hulk' || z.kind === 'Brute') continue;
+          if (z.pos.z > lay.DOOR.z && z.pos.distance(lay.DOOR_OUT) < 1.9) {
+            z.pos = v3(z.pos.x, z.pos.y, z.pos.z + 0.9);
+            z.stagger = Math.max(z.stagger, 1.2);
+            z.wind = 0.0;
+            n += 1;
+          }
+        }
+        if (n > 0) {
+          g.play('bang', 0.8);
+          g.say(n > 1 ? `The door knocks ${n} zombies back! Close it [E] or fight.` : 'The door knocks a zombie back! Close it [E] or fight.');
+        }
+      }
       break;
     case 'BedDoor': g.say(g.has_hammer() ? 'It is jammed. Hit it with the hammer (LMB).' : 'It is jammed. Find a hammer.'); break;
     case 'Radio':
@@ -920,6 +972,9 @@ export function player_system(g, dt_raw, ctx) {
   const cam = cam_of(ctx);
   const click = mouse.just_pressed('Left');
   const enter = keys.just_pressed('Enter') || keys.just_pressed('Space');
+  // Nhật ký phím E (phiên 8: tìm nguyên nhân công tắc 13:00 bỏ lần bấm đầu). Bot đọc window.__twtEdbg.
+  const eRec = keys.just_pressed('KeyE') ? { f: (globalThis.__twtEf = (globalThis.__twtEf || 0) + 1), mode: g.mode, cine: g.cine ? g.cine[0] : -1, panel: g.panel.k, at: 'start' } : null;
+  if (eRec) { const L = (globalThis.__twtEdbg = globalThis.__twtEdbg || []); L.push(eRec); if (L.length > 40) L.shift(); }
 
   // Khoá chuột khi bấm vào game; Esc nhả.
   if (cursor.locked && !web.pointer_locked()) {
@@ -1720,8 +1775,10 @@ export function player_system(g, dt_raw, ctx) {
     g.hold_t = 0.0;
     g.hold_id = 0;
   }
+  if (eRec) { eRec.at = 'dispatch'; eRec.t = target.k; eRec.need = need; eRec.pr = g.prompt; }
   if (keys.just_pressed('KeyE') && (need === 0.0 || (target.k === 'Door' && g.door.hp >= game.DOOR_HP))) {
     press_e(g, target);
+    if (eRec) { eRec.fired = true; eRec.notice = g.notice; }
   }
   if (need > 0.0 && g.hold_t > 0.0) {
     g.prompt = `${g.prompt}  ${(g.hold_t / need * 100.0).toFixed(0)}%`;

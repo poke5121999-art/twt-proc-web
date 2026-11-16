@@ -43,6 +43,17 @@ const QUALITY = [
 const PLUGINS = ['dress', 'env', 'fxaudio', 'loot', 'hands', 'stock', 'till', 'pricetag'];
 const G = window.__G = { params, U, postFx: { flash: 0, hurt: 0 }, errors: [], t: 0, dt: 1 / 60, frames: 0, updaters: [], preRender: [], plugins: {}, THREE };
 const seen = new Set();
+// Dynamic import with retry (phiên 8): sw.js already retries 5xx / failed fetches, this covers browsers without a service
+// worker (or before it controls the page). A failed module graph is remembered per URL, so each retry adds ?r=<n>.
+async function importRetry(p, tries = 4) {
+  for (let i = 0; ; i++) {
+    try { return await import(i ? p + '?r=' + i : p); } catch (e) {
+      if (i >= tries - 1 || !/fetch|import|load|network|MIME/i.test(String(e && e.message))) throw e;
+      console.warn('[import] ' + p + ' failed (' + (e && e.message) + '), retry ' + (i + 1));
+      await new Promise((r) => setTimeout(r, 600 * Math.pow(2, i)));
+    }
+  }
+}
 G.prof = {};
 function guard(tag, fn) {
   const t0 = performance.now();
@@ -103,7 +114,7 @@ async function bootGame() {
   if (params.ppl !== 'none') {
     stage('people');
     // robots by default (js/robots/, original cast); ?people=lf falls back to the Lanternfall humans of people.js
-    try { const m = await import(params.people === 'lf' ? './people.js' : './robots/people-robots.js'); people = G.people = m.createPeople({ scene: G.scene, camera: G.camera, renderer, quality: G.quality }); }
+    try { const m = await importRetry(params.people === 'lf' ? './people.js' : './robots/people-robots.js'); people = G.people = m.createPeople({ scene: G.scene, camera: G.camera, renderer, quality: G.quality }); }
     catch (e) { console.warn('[people] not available: ' + (e && e.message)); }
   }
   scene.install({ spawn: (mesh, matName, tr) => sg.spawn(mesh, matName, tr), people });
@@ -128,14 +139,14 @@ async function bootGame() {
 
   stage('hud');
   if (params.hud !== 'none') {
-    try { const h = await import('./hud.js'); G.hud = h; guard('setup_hud', () => h.setup_hud(g, ctx)); }
+    try { const h = await importRetry('./hud.js'); G.hud = h; guard('setup_hud', () => h.setup_hud(g, ctx)); }
     catch (e) { console.error('[hud] failed to load: ' + (e && e.stack || e)); }
   }
   {
     const off = new Set((params.noplug || '').split(',').filter(Boolean));
     const want = PLUGINS.concat((params.plug || '').split(',').filter(Boolean)).filter((n, i, a) => a.indexOf(n) === i && !off.has(n) && !off.has('all'));
     for (const name of want) {
-      try { const m = await import('./plug/' + name + '.js'); G.plugins[name] = (await m.install(G)) || true; }
+      try { const m = await importRetry('./plug/' + name + '.js'); G.plugins[name] = (await m.install(G)) || true; }
       catch (e) { console.error('[plug] ' + name + ' failed: ' + (e && e.stack || e)); }
     }
   }
@@ -185,13 +196,19 @@ function applyEnv(dt) {
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   let sd = [E.sun_dir[0], E.sun_dir[1], E.sun_dir[2]];
   if (m > 0) { const hl = Math.hypot(sd[0], sd[2]) || 1, el = Math.asin(Math.min(1, sd[1])), e2 = el + (0.72 - el) * m * 0.85; sd = [sd[0] / hl * Math.cos(e2), Math.sin(e2), sd[2] / hl * Math.cos(e2)]; }
+  // Pink dawn (view only; ?dawn=0 keeps the table): day 1 opens at 5:30 and the original game shows a lit mauve-pink
+  // morning there, street and lot clearly readable through a rosy haze (cmp/rebuild/audit-ref/m01_04_0.jpg). Around
+  // 4:30-7:30 lift the sky dome (it is also the ambient light via the PMREM capture), tint the haze pink and thicken it.
+  const dw = params.dawn === '0' ? 0 : ss(4.0, 5.1, hour) * (1 - ss(6.6, 8.2, hour)) * (1 - raid) * (1 - 0.6 * fx.rain);
   G.sky.update({
-    sunDir: sd, sunCol: mix3(E.sun_col, [1.0, 0.95, 0.86], m * 0.8), sunK,
-    zen: mix3([E.sky_col[0] * 0.42, E.sky_col[1] * 0.58, E.sky_col[2] * 0.73], [0.10, 0.22, 0.50], m),
-    hor: mix3(E.horizon, [0.80, 0.78, 0.72], m * 0.7), horAway: mix3(E.zenith, [0.42, 0.56, 0.78], m * 0.9), fog: mix3(E.fog_col, [0.55, 0.62, 0.70], m * 0.6),
-    night, raid, cloud: E.zenith[3] * (1 - 0.8 * m),
+    sunDir: sd, sunCol: mix3(mix3(E.sun_col, [1.0, 0.95, 0.86], m * 0.8), [1.0, 0.62, 0.55], dw * 0.6), sunK: sunK * (1 + 0.25 * dw),
+    zen: mix3(mix3([E.sky_col[0] * 0.42, E.sky_col[1] * 0.58, E.sky_col[2] * 0.73], [0.10, 0.22, 0.50], m), [0.16, 0.17, 0.36], dw * 0.85),
+    hor: mix3(mix3(E.horizon, [0.80, 0.78, 0.72], m * 0.7), [1.0, 0.56, 0.52], dw * 0.7),
+    horAway: mix3(mix3(E.zenith, [0.42, 0.56, 0.78], m * 0.9), [0.40, 0.30, 0.44], dw * 0.9),
+    fog: mix3(mix3(E.fog_col, [0.55, 0.62, 0.70], m * 0.6), [0.82, 0.52, 0.56], dw * 0.9),
+    night, raid, cloud: E.zenith[3] * (1 - 0.8 * m) * (1 - 0.25 * dw),
   }, dt);
-  G.dayLift = m;
+  G.dayLift = m; G.dawnLift = dw;
   const sun = G.lights.sun, S = G.lights.S;
   sun.intensity = E.sun_dir[3] * Math.PI;
   const texel = (2 * S) / sun.shadow.mapSize.x;
@@ -210,8 +227,8 @@ function applyEnv(dt) {
   }
   U.uRain.value = Math.max(fx.wet, fx.rain);
   U.uAmbK.value = 0.35 + 0.65 * (1 - night);
-  U.uSkyC.value.setRGB(E.sky_col[0], E.sky_col[1], E.sky_col[2]);
-  TUNE.volSigma = (TUNE.volSigma0 || (TUNE.volSigma0 = TUNE.volSigma)) * (E.fog_col[3] / 0.0034);
+  U.uSkyC.value.setRGB(E.sky_col[0] + (0.30 - E.sky_col[0]) * dw * 0.8, E.sky_col[1] + (0.24 - E.sky_col[1]) * dw * 0.8, E.sky_col[2] + (0.32 - E.sky_col[2]) * dw * 0.8);
+  TUNE.volSigma = (TUNE.volSigma0 || (TUNE.volSigma0 = TUNE.volSigma)) * (E.fog_col[3] / 0.0034) * (1 + 1.5 * dw);
   if (G.post) G.post.vol.u.uSigma.value = TUNE.volSigma;
   // "inside" boxes for the material shader (dry, darker ambient) and the dusty-interior volume
   const im = E.inside_min, ix = E.inside_max;

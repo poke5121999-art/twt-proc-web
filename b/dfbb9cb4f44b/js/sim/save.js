@@ -86,6 +86,7 @@ export function save_string(g) {
     g.forgiven_due ? 1 : 0,
     g.stock_sel,
   ];
+  const fixed = g.shelves.filter((s) => s.prop === 0);
   const shelf = (s) => s.slots.map((x) => String(x !== null ? x : -1)).join(',');
   const shelfn = (s) => s.counts.map((x) => String(x | 0)).join(',');
   const done = g.done.map((d) => (d ? 1 : 0));
@@ -99,10 +100,11 @@ export function save_string(g) {
     `core=${nums(core)}`,
     `prices=${sparse(g.prices, (i, p) => p === Math.max(items.ival(i), 1))}`,
     `inv=${sparse(g.inv, (_, n) => n === 0)}`,
-    `shelf0=${shelf(g.shelves[0])}`,
-    `shelf1=${shelf(g.shelves[1])}`,
-    `shelfn0=${shelfn(g.shelves[0])}`,
-    `shelfn1=${shelfn(g.shelves[1])}`,
+    // kệ cố định (prop 0): một kệ ván từ phiên 7 (hai kệ với ?shelves=2); kệ dựng thêm lưu trong `build`
+    `shelf0=${fixed[0] ? shelf(fixed[0]) : ''}`,
+    `shelf1=${fixed[1] ? shelf(fixed[1]) : ''}`,
+    `shelfn0=${fixed[0] ? shelfn(fixed[0]) : ''}`,
+    `shelfn1=${fixed[1] ? shelfn(fixed[1]) : ''}`,
     `done=${nums(done)}`,
     `caches=${nums(caches)}`,
     `gifts=${nums(gifts)}`,
@@ -231,7 +233,7 @@ export function load(g, slot, prev) {
   for (const [i, n] of pairs('inv')) {
     g.inv[i] = n;
   }
-  for (let sh = 0; sh < 2; sh++) {
+  for (let sh = 0; sh < Math.min(2, g.shelves.filter((x) => x.prop === 0).length); sh++) {
     const vs = parse(field(s, sh === 0 ? 'shelf0' : 'shelf1')).slice(0, g.shelves[sh].slots.length);
     vs.forEach((v, k) => {
       g.shelves[sh].slots[k] = v >= 0 && v < N_ITEMS ? v : null;

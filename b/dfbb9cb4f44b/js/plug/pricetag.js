@@ -8,6 +8,8 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { noMask } from '../mats.js';
 import * as items from '../sim/items.js';
 import { item_icon } from '../icons.js';
+import * as lay from '../sim/lay.js';
+import { tag_y, plank_tag_slot } from '../sim/player.js';
 
 const W = 0.26, H = 0.09, LIP_Y = 0.41, LIP_Z = 0.2525; // top edge just above the board top (0.445), hanging over the lip
 const CW = 320, CH = 116;
@@ -82,6 +84,7 @@ export async function install(G) {
     const live = new Set(g.shelves);
     for (const [sh, arr] of tags) if (!live.has(sh)) { for (const t of arr) if (t) { root.remove(t.mesh); } tags.delete(sh); }
     const lt = g.look_tag;
+    const night = G.sky && G.sky.uniforms ? G.sky.uniforms.uNight.value : 0;
     for (let si = 0; si < g.shelves.length; si++) {
       const sh = g.shelves[si];
       let arr = tags.get(sh);
@@ -89,7 +92,7 @@ export async function install(G) {
       for (let k = 0; k < sh.slots.length; k++) {
         const it = sh.slots[k];
         let t = arr[k];
-        if (it === null) { if (t) t.mesh.visible = false; continue; }
+        if (it === null || (sh.plank && plank_tag_slot(sh, k % sh.cols) !== k)) { if (t) t.mesh.visible = false; continue; }
         if (!t) {
           const mesh = new THREE.Mesh(geo, noMask(new THREE.MeshBasicMaterial({ color: new THREE.Color(1.15, 1.15, 1.15) }))); mesh.castShadow = false; mesh.receiveShadow = false;
           const frame = new THREE.Mesh(frameGeo, frameMat); frame.position.z = -0.0015; frame.visible = false; mesh.add(frame);
@@ -108,15 +111,19 @@ export async function install(G) {
         const col = k % sh.cols, lvl = Math.trunc(k / sh.cols);
         const lx = (col + 0.5 - sh.cols * 0.5) * 0.6;
         const c = Math.cos(sh.yaw), s = Math.sin(sh.yaw);
-        t.mesh.position.set(sh.pos.x + c * lx + s * LIP_Z, LIP_Y + lvl * 0.5 + sh.pos.y, sh.pos.z - s * lx + c * LIP_Z);
-        t.mesh.rotation.set(t.flip > 0 ? Math.PI * 2 * f : 0, sh.yaw, 0, 'YXZ');
+        // kệ ván: một thẻ mỗi cột (món trước nhất) treo dưới mép trước, ngả ra sau 0,35 rad; kệ tầng: mỗi tầng một thẻ dưới mép ván
+        const lz = sh.plank ? lay.PLANK_FRONT + 0.006 : LIP_Z, ly = sh.plank ? tag_y() : LIP_Y + lvl * 0.5;
+        t.mesh.position.set(sh.pos.x + c * lx + s * lz, ly + sh.pos.y, sh.pos.z - s * lx + c * lz);
+        t.base = 1;
+        t.mesh.rotation.set((t.flip > 0 ? Math.PI * 2 * f : 0) + (sh.plank ? -0.35 : 0), sh.yaw, 0, 'YXZ');
         const hl = lt && lt[0] === si && lt[1] === k;
         t.frame.visible = !!hl;
         const flash = t.flip > 0 ? Math.sin(Math.PI * f) * 0.9 : 0;
         const pulse = hl ? 0.25 + 0.12 * Math.sin(G.t * 9) : 0;
-        t.mesh.material.color.setScalar(1.15 + flash + pulse);
-        const sc = hl ? 1.08 : 1;
-        t.mesh.scale.set(sc, sc, 1);
+        // paper is unlit: dim it a little at night so it does not glow like a screen (lamps still light the shop)
+        t.mesh.material.color.setScalar(1.15 * (1 - 0.3 * night) + flash + pulse);
+        const sc = (hl ? 1.08 : 1) * t.base;
+        t.mesh.scale.set(sc, sc * (sh.plank ? 0.86 : 1), 1);
         t.mesh.visible = true; n++;
       }
       for (let k = sh.slots.length; k < arr.length; k++) if (arr[k]) arr[k].mesh.visible = false;
