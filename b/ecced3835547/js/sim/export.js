@@ -118,7 +118,7 @@ export function export_system(g, dt, ctx) {
     g.speed = Math.min(Math.max(Math.fround(sp), 0.1), 60.0);
   }
   const todo = g.todo().map((t) => `"${esc(t[1])}"`);
-  const props = g.props.filter((p) => !p.dead).map((p) => `{"id":${p.id},"k":"${kind_tag(p.kind)}","x":${rfix(p.pos.x, 2)},"z":${rfix(p.pos.z, 2)}${p.kind.k === 'Cache' ? `,"n":"${esc(p.kind.a)}","c":${(p.kind.b || []).length}` : ''}}`);
+  const props = g.props.filter((p) => !p.dead).map((p) => `{"id":${p.id},"k":"${kind_tag(p.kind)}","x":${rfix(p.pos.x, 2)},"z":${rfix(p.pos.z, 2)}${p.kind.k === 'Cache' ? `,"n":"${esc(p.kind.a)}","c":${(p.kind.b || []).length}` : ''}${p.kind.k === 'Item' ? `,"it":${p.kind.a}` : ''}}`);
   const zs = g.zombies.filter((z) => !z.dead).map((z) => {
     let kd;
     switch (z.kind) {

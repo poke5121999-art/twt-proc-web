@@ -136,6 +136,14 @@ export function case_units() {
 export function stack_max() {
   return case_units() === 1 ? 1 : case_units() * STACK_CASES;
 }
+/// Lục xác zombie / chỗ lục: luật gốc (clip 04 GameEdged Day 1 28:00-28:15: đang "Searching..." từng món văng ra khỏi xác
+/// rơi xuống đất; clip 03 JMXP 3:20-3:35 chỗ lục "Tinned Beans x2, Beer" cũng văng ra; pin cộng thẳng vào số pin trên HUD,
+/// clip 02 Zanzibar 21:20-22:00 44 -> 62). Món nằm trên đất nhặt từng món: cầm hộp các-tông thì vào hộp ("Carry", clip 04
+/// 28:37-28:47, thanh 0/80 -> 30/80 -> 45/80), không cầm hộp thì vào ba lô như món rời có sẵn. `?loot=bag` = bản cũ (mọi
+/// món vào thẳng ba lô).
+export function loot_bag() {
+  return query('loot') === 'bag';
+}
 /// `?stack=1` = luật gốc của mọi phần đã rời gốc (kệ chồng, giỏ khách, chỗ lục thêm, đầy lại chỗ lục).
 export function orig_rules() {
   return case_units() === 1;

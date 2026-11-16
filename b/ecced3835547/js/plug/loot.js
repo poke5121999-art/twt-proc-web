@@ -499,7 +499,7 @@ function makeMarkers(G, v) {
 }
 
 // ---------------------------------------------------------------- loot plug-in state
-const S = { views: new Map(), goodsNode: null, goodsSig: '', fly: [], glint: null, meshCache: new Map(), events: 0, collected: 0, maxFly: 0 };
+const S = { views: new Map(), goodsNode: null, goodsSig: '', fly: [], glint: null, meshCache: new Map(), events: 0, collected: 0, maxFly: 0, hide: new Set(), dropped: new Set() };
 const CAP_FLY = 48;
 const yawOf = (p, v) => (v.d.yaw || 0) + (p.yaw || 0);
 
@@ -596,6 +596,18 @@ function spawnBurst(G, ev, v, p) {
   // throw away from the container, biased toward the player so the items land in view
   const toP = Math.atan2(g.player.x - ev.pos.x, g.player.z - ev.pos.z);
   const r = rng('burst' + S.events);
+  if (ev.drops) {
+    // Original rule (sim/player.js drop_loot): each item pops out and stays on the ground as a real `Item` prop. Fly a copy
+    // on an arc to the prop's own spot, a little hop on landing, then hand over to the prop (hidden meanwhile).
+    ev.drops.forEach((id, k) => {
+      const pr = g.prop(id); if (!pr) return;
+      S.hide.add(id); S.dropped.add(id);
+      S.fly.push({ it: pr.kind.a, drop: id, node: null, delay: 0.12 + k * 0.16, t: 0, state: 'wait', p: base.clone(), a: base.clone(), b: new Vec3(pr.pos.x, 0.0, pr.pos.z),
+        q: new THREE.Quaternion().setFromEuler(new THREE.Euler(r() * 6, r() * 6, r() * 6)), w: new THREE.Vector3(r.range(-9, 9), r.range(-6, 6), r.range(-9, 9)), h: r.range(0.55, 0.85) });
+    });
+    S.maxFly = Math.max(S.maxFly, S.fly.length);
+    return;
+  }
   ev.items.forEach((it, k) => {
     if (S.fly.length >= CAP_FLY) { feed(G, it); return; }
     // alternate left / right of the line to the player so they land beside the container, in view
@@ -622,6 +634,20 @@ function stepFly(G, dt) {
       f.state = 'air'; f.t = 0;
       f.node = G.sg.spawn(itemMesh(f.it), 'solid', { pos: f.p.clone(), quat: [f.q.x, f.q.y, f.q.z, f.q.w], name: 'loot-fly', dynamic: true });
       play('swish', 0.35, f.p.clone());
+    }
+    if (f.drop !== undefined) {
+      // dropped loot: arc to its spot, hop, hand over to the real prop
+      const T = 0.5, u = Math.min(f.t / T, 1), e = u;
+      f.p = new Vec3(f.a.x + (f.b.x - f.a.x) * e, f.a.y + (f.b.y + 0.06 - f.a.y) * e + f.h * Math.sin(Math.PI * u), f.a.z + (f.b.z - f.a.z) * e);
+      if (u < 1) { _w.copy(f.w).multiplyScalar(dt); _q.setFromEuler(_e.set(_w.x, _w.y, _w.z)); f.q.premultiply(_q); }
+      else {
+        if (!f.landed) { f.landed = true; play('tink', 0.4, f.p.clone()); }
+        const st = (f.t - T) / 0.18;
+        f.p = new Vec3(f.b.x, f.b.y + 0.06 + 0.05 * Math.sin(Math.min(st, 1) * Math.PI), f.b.z);
+        if (st >= 1) { S.hide.delete(f.drop); const pr = g.prop(f.drop); if (pr) pr.dirty = true; f.node.despawn(); S.fly.splice(i, 1); continue; }
+      }
+      f.node.set_tr({ pos: f.p, quat: [f.q.x, f.q.y, f.q.z, f.q.w] });
+      continue;
     }
     if (f.state === 'air') {
       f.v.y -= 9.8 * dt;
@@ -668,12 +694,13 @@ const MARKERS = !/[?&]markers=0\b/.test(typeof location !== 'undefined' ? locati
 export async function install(G) {
   const t0 = performance.now();
   globalThis.__twtLootView = true;
+  globalThis.__twtPropFly = (id) => (S.hide.has(id) ? [new Vec3(0, -50, 0), [0, 0, 0, 1]] : null);
   const g = G.g;
   const caches = () => g.props.filter((p) => !p.dead && p.kind.k === 'Cache');
   for (const p of caches()) { if (!S.views.has(p.id)) S.views.set(p.id, buildView(G, p)); p.dirty = true; }
   // glints: one instanced star per container, twinkling while it still holds goods
   const gm = noMask(new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 7.5, 4.5) }));
-  const glint = S.glint = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.018, 0), gm, Math.max(1, S.views.size + 8));
+  const glint = S.glint = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.018, 0), gm, Math.max(1, S.views.size + 32));
   glint.name = 'loot-glint'; glint.castShadow = false; glint.receiveShadow = false; glint.frustumCulled = false;
   G.scene.add(glint);
   const M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), SC = new THREE.Vector3();
@@ -766,6 +793,16 @@ export async function install(G) {
         } else glint.setMatrixAt(gi, ZM);
         gi++;
       }
+    }
+    // dropped loot lying on the ground (original rule) twinkles like the containers until picked up
+    for (const id of S.dropped) {
+      const it = g.prop(id);
+      if (!it || it.kind.k !== 'Item') { S.dropped.delete(id); continue; }
+      if (S.hide.has(id) || gi >= glint.count) continue;
+      const ph = (t * 0.8 + id * 0.173) % 1, tw = ph < 0.2 ? Math.sin(ph / 0.2 * PI) : 0;
+      P.set(it.pos.x, 0.2 + 0.03 * Math.sin(t * 3 + id), it.pos.z);
+      Q.setFromEuler(_e.set(0, t * 2, PI / 4)); SC.setScalar(0.5 + tw * 1.2);
+      M.compose(P, Q, SC); glint.setMatrixAt(gi++, M);
     }
     for (; gi < glint.count; gi++) glint.setMatrixAt(gi, ZM);
     glint.instanceMatrix.needsUpdate = true;

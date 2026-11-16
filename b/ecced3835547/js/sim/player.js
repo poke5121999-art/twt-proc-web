@@ -406,6 +406,33 @@ export function hold_time(g, t) {
 }
 
 /** Hành động giữ E đã đủ thời gian. */
+/// Đồ lục được văng ra đất quanh chỗ lục (luật gốc, xem game.loot_bag): mỗi món một vật `Item` nằm trên đất, đặt theo vòng
+/// quanh tâm (không rút số ngẫu nhiên để nhịp ngẫu nhiên của ván không đổi), đẩy ra khỏi tường / vật cản; phần nhìn
+/// (plug/loot.js) cho từng món bay ra theo cung rồi mới hiện. Trả dòng "2x Beer, 1x Metal Scraps" như items.give.
+export function drop_loot(g, src_id, at, got, name) {
+  const ids = [];
+  const cnt = new Map();
+  for (const it of got) cnt.set(it, (cnt.get(it) || 0) + 1);
+  // Một chồng lớn (đạn 30-60 viên) là MỘT mục loot ở bản gốc (LootEntry tách theo MaxStack, combat-raids.md L13.4); vật
+  // `Item` ở đây chỉ chứa một món nên chồng trên 12 món vào thẳng ba lô [CHƯA RÕ GỐC: chưa thấy clip nhặt chồng đạn].
+  const big = [...cnt].filter(([, c]) => c > 12).map(([it]) => it);
+  for (const it of big) items.give(g, got.filter((x) => x === it));
+  got = got.filter((x) => !big.includes(x));
+  const n = got.length;
+  got.forEach((it, k) => {
+    // vòng quanh tâm, lệch về phía người chơi để món rơi trong tầm nhìn, cách thân xác robot ~1 m
+    const a0 = Math.atan2(g.player.z - at.z, g.player.x - at.x);
+    const a = a0 + (k % 2 ? 1.0 : -1.0) * (0.45 + 0.4 * Math.floor(k / 2));
+    const r = 0.95 + 0.12 * (k % 3) + (n > 6 ? 0.1 * Math.floor(k / 6) : 0.0);
+    let pos = v3(at.x + Math.cos(a) * r, 0.0, at.z + Math.sin(a) * r);
+    pos = world.resolve(g, pos, 0.2);
+    ids.push(g.add_prop(game.PropKind.Item(it), v3(pos.x, 0.0, pos.z), a));
+  });
+  if (g.loot_events === undefined) g.loot_events = [];
+  if (g.loot_events.length < 16) g.loot_events.push({ id: src_id, name: name || '', pos: at.clone(), items: got.slice(), drops: ids });
+  return [...cnt].map(([it, c]) => `${c}x ${items.iname(it)}`).join(', ');
+}
+
 export function finish_hold(g, t) {
   switch (t.k) {
     case 'Door':
@@ -466,7 +493,7 @@ export function finish_hold(g, t) {
               pr *= 1.0 - ch;
             }
           }
-          const s = items.give(g, got);
+          const s = game.loot_bag() ? items.give(g, got) : drop_loot(g, p.id, p.pos, got);
           g.complete('LootZombie');
           g.xp(0, 5);
           g.play('loot', 0.7);
@@ -479,8 +506,13 @@ export function finish_hold(g, t) {
           p.dirty = true;
           // Phần nhìn (js/plug/loot.js): nắp mở, từng món bay ra theo cung rồi vào ba lô, mỗi món một dòng "vừa nhặt".
           if (g.loot_events === undefined) g.loot_events = [];
-          if (g.loot_events.length < 16) g.loot_events.push({ id: p.id, name: kd.a, pos: p.pos.clone(), items: kd.b.slice() });
-          const s = items.give(g, kd.b);
+          let s;
+          if (game.loot_bag()) {
+            if (g.loot_events.length < 16) g.loot_events.push({ id: p.id, name: kd.a, pos: p.pos.clone(), items: kd.b.slice() });
+            s = items.give(g, kd.b);
+          } else {
+            s = drop_loot(g, p.id, p.pos, kd.b.slice(), kd.a);
+          }
           g.caches_done += 1;
           if (g.caches_done >= 3) {
             g.complete('Caches');

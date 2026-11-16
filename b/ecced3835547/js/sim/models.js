@@ -199,38 +199,85 @@ export function counter(mb) {
     mb.block(v(x, 0.78, -2.2), v(0.74, 0.04, 0.02), shade(body, 1.15), WOOD);
     mb.block(v(x, 0.16, -2.2), v(0.74, 0.04, 0.02), shade(body, 1.15), WOOD);
   }
-  // Ngăn kéo phía người bán: ba ngăn pin màu + hai ngăn gỗ.
-  [0x3fbf5a, 0x3f7fdf, 0x9a4fd0].forEach((c, k) => {
+  // Ngăn kéo phía người bán: ba ngăn kéo pin kéo mở sẵn (mỗi ngăn hai ô theo mệnh giá, viền màu của mệnh giá, xem
+  // BATTERY_LOOK) + hai ngăn gỗ. Pin thật soi xong rơi vào đúng ô (plug/till.js vẽ pin trong ô).
+  [[1, 5], [10, 50], [100, 1000]].forEach((pair, k) => {
     const x = -0.62 + k * 0.44;
     mb.block(v(x, 0.5, -3.03), v(0.4, 0.26, 0.04), shade(body, 0.9), WOOD);
-    mb.emi = 0.35;
-    mb.block(v(x + 0.04, 0.6, -3.045), v(0.32, 0.1, 0.02), hex(c), FLAT);
-    mb.emi = 0.0;
-    mb.tube(v(x + 0.12, 0.55, -3.06), v(x + 0.28, 0.55, -3.06), 0.012, 0.012, 6, hex(0xa0a4a8), METAL);
+    // khay kéo ra phía người bán: đáy, hai thành bên, mặt trước có tay nắm, vách chia giữa
+    const tc = hex(0x3a3f44);
+    mb.block(v(x + 0.03, 0.66, -3.3), v(0.34, 0.012, 0.27), tc, METAL);
+    for (const sx of [x + 0.03, x + 0.358]) mb.block(v(sx, 0.66, -3.3), v(0.012, 0.075, 0.27), shade(tc, 1.1), METAL);
+    mb.block(v(x + 0.03, 0.66, -3.312), v(0.34, 0.09, 0.016), shade(body, 0.85), WOOD);
+    mb.tube(v(x + 0.13, 0.7, -3.325), v(x + 0.27, 0.7, -3.325), 0.01, 0.01, 6, hex(0xa0a4a8), METAL);
+    mb.block(v(x + 0.194, 0.66, -3.3), v(0.012, 0.06, 0.27), shade(tc, 1.2), METAL);
+    pair.forEach((val, j) => {
+      mb.emi = 0.5;
+      mb.block(v(x + 0.045 + j * 0.165, 0.672, -3.296), v(0.14, 0.004, 0.02), hex(BATTERY_LOOK[val].col), FLAT);
+      mb.emi = 0.0;
+    });
   });
   for (const x of [-1.5, 0.9]) {
     mb.block(v(x, 0.2, -3.03), v(0.6, 0.56, 0.04), shade(body, 0.9), WOOD);
     mb.tube(v(x + 0.2, 0.5, -3.06), v(x + 0.4, 0.5, -3.06), 0.012, 0.012, 6, hex(0xa0a4a8), METAL);
   }
-  // Máy tính tiền + khay sạc pin.
-  const till = hex(0x22262b);
-  mb.block(v(0.55, 0.99, -2.88), v(0.7, 0.14, 0.52), till, METAL);
-  mb.push(m4_mul(m4_translate(v(0.9, 1.16, -2.7)), m4_rot_x(-0.5)));
-  mb.cube(ZERO, v(0.6, 0.03, 0.26), hex(0x2c3137), METAL);
-  for (let i = 0; i < 4; i++) {
-    for (let j = 0; j < 3; j++) {
-      mb.cube(v(-0.2 + i * 0.085, 0.022, -0.07 + j * 0.07), v(0.06, 0.02, 0.05), hex((i + j) % 4 === 0 ? 0xc23a30 : 0xcfc9b8), FLAT);
+  // Máy tính tiền: thân dày đặt trên quầy, ngăn tiền phía người bán, bàn phím nghiêng về phía người bán, hộp sau, màn
+  // hình trên cổ đứng rộng (mặt sau có màn nhỏ cho khách), máy in hoá đơn có giấy thò ra. Sơn xanh xám đã mòn cạnh.
+  {
+    const old_bev = mb.bevel;
+    mb.bevel = 0.012;
+    const till = hex(0x3d4943), dark = hex(0x24292d);
+    mb.block(v(0.6, 0.99, -2.9), v(0.6, 0.11, 0.46), till, METAL);
+    mb.block(v(0.58, 0.99, -2.92), v(0.64, 0.02, 0.5), dark, METAL); // đế cao su
+    mb.bevel = 0.006;
+    mb.block(v(0.63, 1.005, -2.925), v(0.54, 0.075, 0.03), shade(till, 1.25), METAL); // mặt ngăn tiền
+    mb.tube(v(0.8, 1.04, -2.94), v(1.0, 1.04, -2.94), 0.009, 0.009, 6, hex(0xa0a4a8), METAL);
+    mb.cyl(v(0.7, 1.035, -2.945), 0.008, 0.008, 0.01, 8, hex(0xc9a84a), METAL);
+    // hộp sau phía khách
+    mb.bevel = 0.012;
+    mb.block(v(0.62, 1.1, -2.64), v(0.56, 0.1, 0.24), till, METAL);
+    // bàn phím nghiêng
+    mb.push(m4_mul(m4_translate(v(0.8, 1.135, -2.77)), m4_rot_x(-0.38)));
+    mb.cube(ZERO, v(0.34, 0.035, 0.24), dark, METAL);
+    mb.bevel = 0.004;
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        const col = j === 3 && i === 3 ? 0x3aa04a : (i === 3 ? 0xd2a33a : (i + j) % 5 === 0 ? 0xc23a30 : 0xd8d2c0);
+        mb.cube(v(-0.12 + i * 0.075, 0.024, -0.09 + j * 0.058), v(0.058, 0.022, 0.044), hex(col), FLAT);
+      }
     }
+    mb.pop();
+    // máy in hoá đơn bên phải, giấy trắng cong ra
+    mb.bevel = 0.008;
+    mb.block(v(1.03, 1.1, -2.88), v(0.15, 0.085, 0.2), dark, METAL);
+    mb.block(v(1.05, 1.183, -2.8), v(0.11, 0.004, 0.012), hex(0x0c0d0e), FLAT);
+    mb.bevel = 0.0;
+    mb.block(v(1.06, 1.185, -2.796), v(0.09, 0.07, 0.003), hex(0xeeeae0), FLAT);
+    mb.push(m4_mul(m4_translate(v(1.105, 1.255, -2.796)), m4_rot_x(0.5)));
+    mb.block(v(-0.045, 0.0, -0.0015), v(0.09, 0.04, 0.003), hex(0xeeeae0), FLAT);
+    mb.pop();
+    // màn hình trên cổ đứng
+    mb.bevel = 0.01;
+    mb.cyl(v(0.9, 1.2, -2.52), 0.07, 0.06, 0.02, 12, dark, METAL);
+    mb.tube(v(0.9, 1.21, -2.52), v(0.9, 1.33, -2.52), 0.028, 0.024, 10, hex(0x55595d), METAL);
+    mb.push(m4_mul(m4_translate(v(0.9, 1.4, -2.52)), m4_rot_x(0.22)));
+    mb.cube(ZERO, v(0.32, 0.16, 0.06), till, METAL);
+    mb.bevel = 0.0;
+    mb.cube(v(0.0, 0.0, -0.031), v(0.28, 0.12, 0.004), hex(0x101414), FLAT);
+    mb.emi = 0.45;
+    mb.cube(v(0.0, 0.0, -0.034), v(0.25, 0.095, 0.004), hex(0x38d66b), FLAT);
+    mb.cube(v(0.0, -0.01, 0.032), v(0.14, 0.05, 0.004), hex(0xe0a030), FLAT);
+    mb.emi = 0.0;
+    mb.pop();
+    // máy soi pin vàng bên trái máy tính tiền: thân, khe cắm trên nóc, đèn (plug/till.js thắp xanh / đỏ)
+    mb.bevel = 0.012;
+    mb.block(v(0.36, 0.99, -2.94), v(0.2, 0.11, 0.16), hex(0xe0b030), METAL);
+    mb.block(v(0.38, 1.095, -2.92), v(0.16, 0.02, 0.12), hex(0x2a2c30), METAL);
+    mb.bevel = 0.0;
+    mb.block(v(0.42, 1.112, -2.875), v(0.08, 0.004, 0.03), hex(0x050505), FLAT);
+    mb.cyl(v(0.53, 1.112, -2.9), 0.014, 0.012, 0.012, 10, hex(0x5a5a5a), METAL);
+    mb.bevel = old_bev;
   }
-  mb.pop();
-  mb.tube(v(1.12, 1.13, -2.5), v(1.12, 1.32, -2.5), 0.015, 0.015, 6, hex(0x55595d), METAL);
-  mb.cube(v(1.12, 1.38, -2.5), v(0.22, 0.12, 0.03), till, METAL);
-  mb.emi = 1.4;
-  mb.cube(v(1.12, 1.38, -2.518), v(0.18, 0.08, 0.005), hex(0x38d66b), FLAT);
-  mb.block(v(0.6, 1.131, -2.84), v(0.3, 0.012, 0.2), hex(0x38d66b), FLAT);
-  mb.emi = 0.0;
-  mb.block(v(0.57, 1.0, -2.36), v(0.66, 0.1, 0.02), hex(0x2c3137), METAL);
-  mb.tube(v(0.8, 1.05, -2.33), v(1.0, 1.05, -2.33), 0.01, 0.01, 6, hex(0xa0a4a8), METAL);
   // Nút báo động.
   mb.lathe(v(-1.35, 0.99, -2.55), [[0.0, 0.0], [0.1, 0.0], [0.1, 0.03], [0.07, 0.04], [0.0, 0.04]], 12, false, hex(0xc9b22a), METAL);
   mb.emi = 0.5;
@@ -688,3 +735,17 @@ export function placed(mb, item) {
  * to append the lying body to mb and return its scale) when the people kit provides it; otherwise only the blood pool
  * is drawn with s = 1.5 for kind 2 (Hulk) and 1.0 otherwise (Rust used the seeded height/1.78 for kinds 0 and 1).
  */
+
+/// Cách nhìn của từng mệnh giá pin (1/5/10/50/100/1000, GeneratePayment): màu vỏ, bán kính, chiều cao. Pin nhỏ là pin
+/// tiểu bạc, lớn dần tới khối pin vàng to; màu khác hẳn nhau để đọc được trên quầy, trong ngăn kéo và trong máy soi.
+export const BATTERY_LOOK = {
+  1: { col: 0xb8bec6, r: 0.016, h: 0.06 },
+  5: { col: 0x3a6fe0, r: 0.019, h: 0.07 },
+  10: { col: 0xf0d020, r: 0.022, h: 0.08 },
+  50: { col: 0xf07a20, r: 0.026, h: 0.09 },
+  100: { col: 0x9a4fd0, r: 0.03, h: 0.1 },
+  1000: { col: 0xf2c94a, r: 0.04, h: 0.11 },
+};
+export function battery_look(value) {
+  return BATTERY_LOOK[value] || BATTERY_LOOK[value >= 1000 ? 1000 : value >= 100 ? 100 : value >= 50 ? 50 : value >= 10 ? 10 : value >= 5 ? 5 : 1];
+}
