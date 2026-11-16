@@ -137,6 +137,7 @@ export function prop_box(p) {
     case 'Pile': r = 0.48; h = 0.25; break;
     case 'Item': r = 0.16; h = 0.3; break;
     case 'Box': r = 0.32; h = 0.36; break;
+    case 'BoxPile': r = 0.36; h = 0.5; break;
     case 'Hammer': r = 0.3; h = 0.2; break;
     case 'Crate': r = 0.42; h = 0.7; break;
     case 'Reward': r = 0.5; h = 0.7; break;
@@ -360,6 +361,7 @@ export function prompt_for(g, t) {
           if (hk !== null && hk.k === 'Box') return `[E] Put ${items.iname(kd.a)} in box`;
           return `[E] Take ${items.iname(kd.a)}`;
         case 'Box': return `[E] Pick up cardboard box (${kd.a.length}/${box_cap(g)})`;
+        case 'BoxPile': return '[E] Take an empty cardboard box';
         case 'Hammer': return '[E] Equip hammer';
         case 'Crate': return '[hold E] Open package';
         case 'Reward': return '[hold E] Open supply drop';
@@ -406,6 +408,35 @@ export function hold_time(g, t) {
 }
 
 /** Hành động giữ E đã đủ thời gian. */
+/// Đồ lục được văng ra đất quanh chỗ lục (luật gốc, xem game.loot_bag): mỗi món một vật `Item` nằm trên đất, đặt theo vòng
+/// quanh tâm (không rút số ngẫu nhiên để nhịp ngẫu nhiên của ván không đổi), đẩy ra khỏi tường / vật cản; phần nhìn
+/// (plug/loot.js) cho từng món bay ra theo cung rồi mới hiện. Trả dòng "2x Beer, 1x Metal Scraps" như items.give.
+export function drop_loot(g, src_id, at, got, name) {
+  const ids = [];
+  const cnt = new Map();
+  for (const it of got) cnt.set(it, (cnt.get(it) || 0) + 1);
+  // Một chồng lớn (đạn 30-60 viên) là MỘT mục loot ở bản gốc (LootEntry tách theo MaxStack, combat-raids.md L13.4); vật
+  // `Item` ở đây chỉ chứa một món nên chồng trên 12 món vào thẳng ba lô [CHƯA RÕ GỐC: chưa thấy clip nhặt chồng đạn].
+  const big = [...cnt].filter(([, c]) => c > 12).map(([it]) => it);
+  for (const it of big) items.give(g, got.filter((x) => x === it));
+  got = got.filter((x) => !big.includes(x));
+  const n = got.length;
+  got.forEach((it, k) => {
+    // vòng quanh tâm, lệch về phía người chơi để món rơi trong tầm nhìn, cách thân xác robot ~1 m
+    const a0 = Math.atan2(g.player.z - at.z, g.player.x - at.x);
+    const a = a0 + (k % 2 ? 1.0 : -1.0) * (0.45 + 0.4 * Math.floor(k / 2));
+    const r = 0.95 + 0.12 * (k % 3) + (n > 6 ? 0.1 * Math.floor(k / 6) : 0.0);
+    let pos = v3(at.x + Math.cos(a) * r, 0.0, at.z + Math.sin(a) * r);
+    pos = world.resolve(g, pos, 0.2);
+    const did = g.add_prop(game.PropKind.Item(it), v3(pos.x, 0.0, pos.z), a);
+    g.props[g.props.length - 1].loose = true; // lưu vào save (save.js `floor`)
+    ids.push(did);
+  });
+  if (g.loot_events === undefined) g.loot_events = [];
+  if (g.loot_events.length < 16) g.loot_events.push({ id: src_id, name: name || '', pos: at.clone(), items: got.slice(), drops: ids });
+  return [...cnt].map(([it, c]) => `${c}x ${items.iname(it)}`).join(', ');
+}
+
 export function finish_hold(g, t) {
   switch (t.k) {
     case 'Door':
@@ -466,7 +497,7 @@ export function finish_hold(g, t) {
               pr *= 1.0 - ch;
             }
           }
-          const s = items.give(g, got);
+          const s = game.loot_bag() ? items.give(g, got) : drop_loot(g, p.id, p.pos, got);
           g.complete('LootZombie');
           g.xp(0, 5);
           g.play('loot', 0.7);
@@ -479,8 +510,16 @@ export function finish_hold(g, t) {
           p.dirty = true;
           // Phần nhìn (js/plug/loot.js): nắp mở, từng món bay ra theo cung rồi vào ba lô, mỗi món một dòng "vừa nhặt".
           if (g.loot_events === undefined) g.loot_events = [];
-          if (g.loot_events.length < 16) g.loot_events.push({ id: p.id, name: kd.a, pos: p.pos.clone(), items: kd.b.slice() });
-          const s = items.give(g, kd.b);
+          let s;
+          if (game.loot_bag()) {
+            if (g.loot_events.length < 16) g.loot_events.push({ id: p.id, name: kd.a, pos: p.pos.clone(), items: kd.b.slice() });
+            s = items.give(g, kd.b);
+          } else {
+            // món đã rơi ra trong lúc lục (spill_cache) + phần còn lại
+            const all = (p.spilled || []).concat(kd.b);
+            drop_loot(g, p.id, p.pos, kd.b.slice(), kd.a);
+            s = loot_text(all);
+          }
           g.caches_done += 1;
           if (g.caches_done >= 3) {
             g.complete('Caches');
@@ -496,6 +535,27 @@ export function finish_hold(g, t) {
     }
     default: break;
   }
+}
+
+/** [ĐỀ XUẤT phiên 7, clip 03 3:20: món bật ra trong lúc "Searching..."] Đang giữ E trên chỗ lục: món rơi ra dần theo tiến độ,
+ *  (n món thì mỗi 1/(n+1) thanh một món, món cuối rơi lúc xong). Nhả E giữa chừng: món đã rơi nằm lại, phần còn lại vẫn trong
+ *  chỗ lục. Chỉ khi đồ văng ra đất (không `?loot=bag`). */
+export function spill_cache(g, id, prog) {
+  if (game.loot_bag()) return;
+  const p = g.prop(id);
+  if (p === null || p.kind.k !== 'Cache' || p.kind.c !== false || p.kind.b.length <= 1) return;
+  const done = p.spilled ? p.spilled.length : 0, total = done + p.kind.b.length;
+  const want = Math.min(total - 1, Math.floor(prog * (total + 1)));
+  if (want <= done) return;
+  const out = p.kind.b.splice(0, want - done);
+  p.spilled = (p.spilled || []).concat(out);
+  drop_loot(g, p.id, p.pos, out, p.kind.a);
+  g.play('pick', 0.35);
+}
+function loot_text(list) {
+  const cnt = new Map();
+  for (const it of list) cnt.set(it, (cnt.get(it) || 0) + 1);
+  return [...cnt].map(([it, c]) => `${c}x ${items.iname(it)}`).join(', ');
 }
 
 /** E trên một cục pin: soi, rồi cất vào ngăn kéo. */
@@ -647,6 +707,23 @@ export function press_e(g, t) {
       const kd = clone_kind(p.kind);
       if (kd.k === 'Corpse' && kd.b === true && !drag) {
         // nothing
+      } else if (kd.k === 'BoxPile') {
+        if (g.held !== null) {
+          g.say('Your hands are full. [X] to drop.');
+          return;
+        }
+        const live = g.props.filter((q) => !q.dead && q.kind.k === 'Box').length;
+        if (live >= game.BOX_PILE_MAX) {
+          g.say(`There are already ${live} boxes around the store. Use one of those.`);
+          g.play('deny', 0.4);
+          return;
+        }
+        const bid = g.add_prop(game.PropKind.Box([]), p.pos.add(v3(0.0, 0.0, 0.55)), 0.3);
+        g.held = bid;
+        g.armed = false;
+        g.cb.throw_item = null;
+        g.play('pick', 0.6);
+        g.complete('PickBox');
       } else if (kd.k === 'Trash' || kd.k === 'Box' || (kd.k === 'Corpse' && kd.b === true)) {
         const is_box = p.kind.k === 'Box';
         const p_kind = clone_kind(p.kind);
@@ -1002,6 +1079,8 @@ export function player_system(g, dt_raw, ctx) {
   if (rebuild) {
     if (ckey !== null) carry.build_vm(g, ckey, main_mb, off_mb);
     else fp.build_vm(cur !== null ? cur : game.HAMMER, main_mb, off_mb);
+    fp.VM_OPTS.grips = [main_mb.grips || [], off_mb.grips || []];
+    fp.VM_OPTS.rev = (fp.VM_OPTS.rev || 0) + 1;
   }
   ViewModels.forEach((node, part) => {
     if (rebuild) {
@@ -1116,6 +1195,7 @@ export function player_system(g, dt_raw, ctx) {
           g.inv[i] -= 1;
           const spot = world.resolve(g, g.player.add(flat_f.mul(0.9)), 0.2);
           g.add_prop({ k: 'Item', a: i }, v3(spot.x, 0.0, spot.z), g.yaw);
+          g.props[g.props.length - 1].loose = true;
           g.play('drop', 0.5);
         }
       }
@@ -1523,6 +1603,7 @@ export function player_system(g, dt_raw, ctx) {
       g.hold_t = 0.0;
     }
     g.hold_t += dt;
+    if (target.k === 'Prop') spill_cache(g, target.a, g.hold_t / need);
     if (g.hold_t >= need) {
       g.hold_t = 0.0;
       g.hold_id = 0;

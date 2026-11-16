@@ -6,7 +6,7 @@
 // Port of src/save.rs (see three/PORT-CONTRACT.md). The text format is byte-compatible with the Rust build, so saves
 // written by the Bevy client under `twtproc.save.v2.<n>` load here and the other way round.
 
-import { trunc } from './vec.js';
+import { trunc, v3 } from './vec.js';
 import { store_del, store_get, store_set } from './web.js';
 import * as game from './game.js';
 import * as items from './items.js';
@@ -76,7 +76,7 @@ export function save_string(g) {
     g.caches_done,
     g.total_served,
     g.bed_door_hits,
-    g.props.filter((p) => p.kind.k === 'Item' && p.kind.a === game.TIN && !p.dead).length,
+    g.props.filter((p) => p.kind.k === 'Item' && p.kind.a === game.TIN && !p.dead && !p.loose).length,
     g.rude_spawned ? 1 : 0,
     g.xpv[0],
     g.xpv[1],
@@ -109,6 +109,8 @@ export function save_string(g) {
     `lm=${nums(lm)}`,
     `lmhp=${nums(lmhp)}`,
     `learned=${nums(learned)}`,
+    // [phiên 7] món rơi trên sàn (đồ lục văng ra, món thả từ ba lô): món:x*100:z*100
+    `floor=${g.props.filter((p) => p.loose && !p.dead && p.kind.k === 'Item').map((p) => `${p.kind.a}:${Math.round(p.pos.x * 100)}:${Math.round(p.pos.z * 100)}`).join(',')}`,
     `skills=${skills.save(g)}`,
     `build=${build.save(g)}`,
     `combat=${combat.save(g)}`,
@@ -266,7 +268,7 @@ export function load(g, slot, prev) {
     } else if (kd.k === 'Pile' && piles > 0) {
       piles -= 1;
       p.dead = true;
-    } else if (kd.k === 'Item' && tins > 0) {
+    } else if (kd.k === 'Item' && tins > 0 && !p.loose) {
       tins -= 1;
       p.dead = true;
     } else if (kd.k === 'Cache') {
@@ -276,6 +278,12 @@ export function load(g, slot, prev) {
       }
       cache_i += 1;
     }
+  }
+  for (const e of field(s, 'floor').split(',')) {
+    const [a, x, z] = e.split(':').map((v) => parse_i32(v));
+    if (a === null || a === undefined || x === null || z === null || a < 0 || a >= N_ITEMS) continue;
+    g.add_prop({ k: 'Item', a }, v3(x / 100, 0.0, z / 100), 0.0);
+    g.props[g.props.length - 1].loose = true;
   }
   combat.load(g, field(s, 'combat'));
   if (g.has_w(game.HAMMER) || g.done[game.Q_ORDER.indexOf('Hammer')]) {

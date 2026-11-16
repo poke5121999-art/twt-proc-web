@@ -80,6 +80,8 @@ export const MOLOTOV = 128;
 export const NAIL_BOMB = 136;
 export const TV = 224;
 export const SHELF_FLIMSY = 81;
+export const RECIPE_FLIMSY = 82;
+export const BOX_PILE_MAX = 6;
 export const SHELF_DUAL = 67;
 export const SHELF_SECURE = 175;
 export const TABLE_SECURE = 176;
@@ -135,6 +137,14 @@ export function case_units() {
 }
 export function stack_max() {
   return case_units() === 1 ? 1 : case_units() * STACK_CASES;
+}
+/// Lục xác zombie / chỗ lục: luật gốc (clip 04 GameEdged Day 1 28:00-28:15: đang "Searching..." từng món văng ra khỏi xác
+/// rơi xuống đất; clip 03 JMXP 3:20-3:35 chỗ lục "Tinned Beans x2, Beer" cũng văng ra; pin cộng thẳng vào số pin trên HUD,
+/// clip 02 Zanzibar 21:20-22:00 44 -> 62). Món nằm trên đất nhặt từng món: cầm hộp các-tông thì vào hộp ("Carry", clip 04
+/// 28:37-28:47, thanh 0/80 -> 30/80 -> 45/80), không cầm hộp thì vào ba lô như món rời có sẵn. `?loot=bag` = bản cũ (mọi
+/// món vào thẳng ba lô).
+export function loot_bag() {
+  return query('loot') === 'bag';
 }
 /// `?stack=1` = luật gốc của mọi phần đã rời gốc (kệ chồng, giỏ khách, chỗ lục thêm, đầy lại chỗ lục).
 export function orig_rules() {
@@ -374,6 +384,7 @@ export const PropKind = Object.freeze({
   Pile: () => ({ k: 'Pile' }),
   Item: (i) => ({ k: 'Item', a: i }),
   Box: (v) => ({ k: 'Box', a: v.slice() }),
+  BoxPile: () => ({ k: 'BoxPile' }),
   Hammer: () => ({ k: 'Hammer' }),
   Crate: (v) => ({ k: 'Crate', a: v.slice() }),
   Reward: (v) => ({ k: 'Reward', a: v.slice() }),
@@ -944,6 +955,7 @@ export class Game {
       for (const [name, p, its, yaw] of caches) {
         this.add_prop(PropKind.Cache(name, its, false), p, yaw);
       }
+      this.add_prop(PropKind.BoxPile(), lay.BOX_PILE, 0.15); // xem cuối hàm
       return;
     }
     const caches = [
@@ -959,6 +971,9 @@ export class Game {
     for (const [name, p, its] of caches) {
       this.add_prop(PropKind.Cache(name, its, false), p, 0.0);
     }
+    // [ĐỀ XUẤT phiên 7] Đống hộp các-tông gấp dẹt cạnh hộp đầu tiên (clip 03 3:05: người chơi lấy hộp từ đống
+    // "Cardboard Boxes"): [E] lấy một hộp rỗng, tối đa BOX_PILE_MAX hộp nằm quanh quán. Thêm sau cùng để id cũ không đổi.
+    this.add_prop(PropKind.BoxPile(), lay.BOX_PILE, 0.15);
   }
 
   /// "Skip Introduction": 09:00, đã dọn quán, có búa, hộp thiếc đã nằm trong ba lô.
@@ -1559,7 +1574,10 @@ export class Game {
       this.add_prop(PropKind.Crate(its), lay.DELIVERY, 0.2);
     }
     if (this.day === 2) {
-      this.add_prop(PropKind.Crate([TIN, TIN, BEANS, FRUIT, CLOTH, NAILS, NAILS, WIRING, WIRING]), lay.DELIVERY2, -0.3);
+      // [ĐỀ XUẤT phiên 7] Bản gốc bắt đầu với 2 kệ và kệ thêm chỉ có bằng chế tạo: tờ công thức "Flimsy Wooden Shelf"
+      // (2 Plank, 3 giây, bàn cấp 0) rơi từ một thùng gỗ ở tập 1 (clip 02 39:33), Dual Shelving Unit qua nút kỹ năng
+      // Crafting. Bản này trước đây không có đường nào ra tờ công thức kệ mỏng: nay nó nằm trong thùng giao ngày 2.
+      this.add_prop(PropKind.Crate([TIN, TIN, BEANS, FRUIT, CLOTH, NAILS, NAILS, WIRING, WIRING, RECIPE_FLIMSY, PLANK, PLANK]), lay.DELIVERY2, -0.3);
     }
     this.scav = [false, false];
     this.sales = [];

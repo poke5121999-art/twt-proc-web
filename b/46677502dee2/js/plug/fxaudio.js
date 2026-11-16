@@ -166,8 +166,25 @@ export async function install(G) {
     }
     return best;
   };
+  // The rules resolve bullets and melee against XZ collider boxes 3.2 m tall. A shelf is an open frame inside its box, so
+  // a hit on its box face is often empty air: a decal there floats (owner screenshot 2026-11-16). Hits on a shelf box get
+  // chips and the sound but no decal; real surfaces found by the shell clip (normal given) are untouched.
+  const onShelf = (P) => {
+    for (const sh of g.shelves || []) {
+      const dx = P.x - sh.pos.x, dz = P.z - sh.pos.z, c = Math.cos(sh.yaw), s = Math.sin(sh.yaw);
+      const lx = dx * c - dz * s, lz = dx * s + dz * c, half = sh.cols * 0.3 + 0.35;
+      if (Math.abs(lx) < half && Math.abs(lz) < 0.7 && P.y < 2.6) return true;
+    }
+    return false;
+  };
   const worldImpact = (P, dir, surface, normal) => {
     stats.impacts++;
+    if (!normal && P.y > 0.08 && G.params.decalfix !== '0' && onShelf(P)) {
+      stats.noDecal = (stats.noDecal || 0) + 1;
+      fx.debris(P, { color: [0.42, 0.3, 0.2], count: 5, size: 0.03, speed: 2.5, normal: dir.clone().negate() });
+      if (snd.sl) snd.sl_play('impact_wood', { pos: P, gain: 0.5, pitch: 1.0, jitter: 0.1 });
+      return;
+    }
     bus.emit('impact', { point: P, normal: normal || (P.y < 0.08 ? UP.clone() : wallNormal(dir)), dir, surface, enemy: false, from: 'player' });
   };
   const flesh = (P, dir) => {

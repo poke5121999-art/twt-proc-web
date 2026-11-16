@@ -681,7 +681,12 @@ const SLEEVE = 0x4a4f44;
 const SKIN = 0xc68a5e;
 
 /** Một cánh tay từ khuỷu tới bàn tay đang nắm quanh điểm `grip`; `palm` là hướng lòng bàn tay; `side` 1 tay phải, -1 tay trái. */
+/** View switch (plug/hands.js clears `arms` so the first-person meshes carry only the held item; `?hands=old` keeps them). */
+export const VM_OPTS = { arms: true };
+
 export function arm(mb, grip, elbow, palm, side) {
+  // plug/hands.js draws its own robot hands at the same grips: record them on the mesh builder (view only)
+  if (!VM_OPTS.arms) { (mb.grips || (mb.grips = [])).push({ grip, elbow, palm, side }); return; }
   const { FLAT } = geom;
   const y = normalize_or(grip.sub(elbow), Y);
   const z = normalize_or(palm.sub(y.mul(palm.dot(y))), Z);
