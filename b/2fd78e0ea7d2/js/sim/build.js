@@ -442,14 +442,12 @@ export function finish_hold(g, st) {
       g.toast = 'Backroom Privileges';
       g.toast_t = 3.5;
       // Luật gốc: mở cửa kho thì mỗi điểm sinh trong kho (3 điểm) ra một zombie nhắm vào người chơi.
-      // [ĐỀ XUẤT] Ba con không lao ra cùng lúc: con thứ hai và thứ ba đứng dậy chậm hơn 2,5 và 5 giây, để người chơi
-      // chỉ có búa đánh được từng con ở ô cửa (bản gốc không ghi độ trễ).
       const spots = [[-1.5, -9.5], [6.0, -9.0], [10.5, -14.0]];
       for (let k = 0; k < spots.length; k++) {
         const [x, z] = spots[k];
         const i = actors.spawn_zombie(g, 'Base', v3(x, 0.0, z), false);
         g.zombies[i].chasing = true;
-        g.zombies[i].stagger = k * 2.5;
+        g.zombies[i].stagger = 0.0; // phiên 8: luật gốc, ba con ra cùng lúc (bỏ độ trễ 2,5 / 5 s [ĐỀ XUẤT] cũ)
       }
       g.add_prop({ k: 'Item', a: 13 }, lay.RECIPE_SPOT.clone(), 0.3);
       break;

@@ -769,9 +769,7 @@ export function detect_radius(hour) {
 }
 
 export function roam_cap(day, hour) {
-  // [ĐỀ XUẤT phiên 7] Ngày 2 là ngày đầu có zombie lang thang, người chơi mới chỉ có búa: đêm ngày 2 tối đa 3 con
-  // (bản gốc 5). Phiên 4-6 bot flow chết ở đêm ngày 2 nhiều lần vì nhiều con lọt vào quán lúc chạng vạng.
-  if (day === 2) return Math.min(roam_cap(3, hour), hour < 21.6 ? 2 : 3);
+  // Luật gốc (phiên 8 bỏ trần 3 con của đêm ngày 2 phiên 7 theo chủ dự án: "giống bản gốc trước").
   if (day < 2 || hour < 9.6) {
     return 0;
   } else if (hour < 12.0) {
@@ -990,8 +988,6 @@ function tick_zombies(g, fx, dt) {
         z.cd = cooldown;
         g.door.hp -= 25.0;
         g.play('bang', 0.8);
-        // phiên 8: người chơi trong quán biết có zombie ngoài cửa trước khi mở
-        if (game.Game.in_shop(player) && g.notice_t <= 0.0 && !g.raid.active) g.say('Zombies are banging on the front door!');
         g.fxq.push([fxs.FX_DEBRIS, v3(clamp(z.pos.x, lay.DOOR_BOX[0] + 0.2, lay.DOOR_BOX[2] - 0.2), 1.2, lay.DOOR_BOX[3] + 0.05)]);
         if (g.door.hp <= 0.0) {
           g.door.hp = 0.0;

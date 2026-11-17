@@ -805,24 +805,6 @@ export function press_e(g, t) {
       }
       g.door.open = !g.door.open;
       g.play('door', 0.6);
-      // [ĐỀ XUẤT phiên 8] Mở cửa đúng lúc zombie đang đập cửa: cánh cửa hất chúng lùi 0,9 m và choáng 1,2 s, đủ để người chơi
-      // đóng lại hay đánh trước. Trước đây hai con đứng sát cửa cào ngay khi mở (100 máu mất trong ~6 s, bot flow chết 1 / 4).
-      if (g.door.open) {
-        let n = 0;
-        for (const z of g.zombies) {
-          if (z.dead || z.hp <= 0.0 || combat.zkind_boss(z.kind) || z.kind === 'Hulk' || z.kind === 'Brute') continue;
-          if (z.pos.z > lay.DOOR.z && z.pos.distance(lay.DOOR_OUT) < 1.9) {
-            z.pos = v3(z.pos.x, z.pos.y, z.pos.z + 0.9);
-            z.stagger = Math.max(z.stagger, 1.2);
-            z.wind = 0.0;
-            n += 1;
-          }
-        }
-        if (n > 0) {
-          g.play('bang', 0.8);
-          g.say(n > 1 ? `The door knocks ${n} zombies back! Close it [E] or fight.` : 'The door knocks a zombie back! Close it [E] or fight.');
-        }
-      }
       break;
     case 'BedDoor': g.say(g.has_hammer() ? 'It is jammed. Hit it with the hammer (LMB).' : 'It is jammed. Find a hammer.'); break;
     case 'Radio':
