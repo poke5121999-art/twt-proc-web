@@ -34,7 +34,7 @@ const CARD_COLS = 5;
 const CARD_ROWS = 4;
 const N_CARDS = CARD_COLS * CARD_ROWS;
 
-export const CONTROLS = 'WASD move  |  Mouse or arrows look  |  Shift sprint  |  Space jump\nE use  (hold E to search, sweep, repair, pry, secure)\nLMB attack / fire / hold to throw  |  RMB take from shelf  |  Q set price\nR reload, rotate a build, or choose stock  |  X drop  |  O open/close store\n1 hands  |  2 melee  |  3 gun  |  4 throwable  |  F heal  |  B quick barbed wire\nTab backpack (equip, build, learn, paint)  |  K skills  |  M world map\nU upgrade (bench, bed, shredder...)  |  hold V pick up a placed object\nL this help  |  P settings';
+export const CONTROLS = 'WASD move  |  Mouse or arrows look  |  Shift sprint  |  Space jump\nE use  (hold E to search, sweep, repair, pry, secure)\nLMB attack / fire / hold to throw  |  RMB take from shelf  |  Q set price\nR reload, rotate a build, or choose stock  |  X drop  |  O open/close store\n1 hands  |  2 melee  |  3 gun  |  4 throwable  |  F heal  |  B bin a coin at the till\nTab backpack (equip, build, learn, paint)  |  K skills  |  M world map\nU upgrade (bench, bed, shredder...)  |  hold V pick up a placed object\nL this help  |  P settings';
 // title screen: a clean menu, one line of the basic keys; the full list stays in the in-game help (L)
 const TITLE_KEYS = 'WASD move  |  E use  |  LMB attack  |  L all controls in game';
 const CONTROL_LINES = new Set(CONTROLS.split('\n').concat([TITLE_KEYS]));

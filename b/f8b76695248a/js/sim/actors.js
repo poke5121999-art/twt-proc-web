@@ -19,14 +19,50 @@ import * as web from './web.js';
 const PI = Math.PI;
 const TAU = Math.PI * 2;
 
-function kind_idx(k) {
-  switch (k) {
-    case 'Food': return 0;
-    case 'Crafting': return 1;
-    case 'Medical': return 2;
-    case 'Weapon': return 3;
+// ---------- độ thèm theo loại món (phiên 9: 14 loại của bản gốc thay 4 nhóm) ----------
+// [GỐC] `~/twt-bevy/docs/rules/browse-checkout-haggle.md` 1.2-1.5 (BuyItemMobGoal.CalculateItemTypeDesires, BrowseMobActionState,
+// PricingPurchaseConsideration, AffordabilityGatePurchaseConsideration). Loại món = `CAT[i].ty` (thứ tự chữ cái của ItemTypeData).
+export const ITEM_TYPES = ['Ammo', 'Appliance', 'Crafting', 'Decoration', 'Defence', 'Food', 'Gun', 'Medicine', 'Melee', 'Seeds', 'Shop', 'Survival', 'Throwable', 'Tool'];
+const T_AMMO = 0, T_DECOR = 3, T_FOOD = 5, T_GUN = 6, T_MELEE = 8;
+// Thứ tự rút của bản gốc (Food, Junk, Clothing, Tool, Gun, Melee, Ammo, Medicine, Seeds, Vehicle, Crafting, Throwable, Defence,
+// Appliance, Shop, Survival); Junk / Clothing / Vehicle không có món nào trong danh mục nên không rút. Decoration không có trong
+// danh sách gốc: không có độ thèm (-1), khách không tìm tới ô chỉ có đồ trang trí.
+const ROLL_ORDER = [T_FOOD, 13, T_GUN, T_MELEE, T_AMMO, 7, 9, 2, 12, 4, 1, 10, 11];
+
+/** Hệ số của loại: Food x2 khi ngày < 2 và trước 15:00; Gun x2; Ammo x3; còn lại x1 (Junk x0,5 không có món). */
+function type_mod(g, t) {
+  if (t === T_FOOD) return g.day < 2 && g.hour() < 15.0 ? 2.0 : 1.0;
+  if (t === T_GUN) return 2.0;
+  if (t === T_AMMO) return 3.0;
+  return 1.0;
+}
+
+/** Độ thèm từng loại của một khách: U(0,2; 2,05) x hệ số loại, rút một lần lúc khách nhận mục tiêu Mua. */
+export function roll_desires(g) {
+  const d = new Array(ITEM_TYPES.length).fill(-1.0);
+  for (const t of ROLL_ORDER) d[t] = g.rng.range(0.2, 2.05) * type_mod(g, t);
+  return d;
+}
+
+/** Độ thèm thô của khách với loại của món (BaseDesires[type]); -1 khi loại không có trong danh sách. */
+export function desire_of(c, item) {
+  const v = c.desire[items.ty_of(item)];
+  return v === undefined ? -1.0 : v;
+}
+
+/** [GỐC] Kệ cộng sức hút / giá: [hệ số sức hút, hệ số giá]. Tủ lạnh: đồ ăn x4 / x3; giá vũ khí: súng, cận chiến, đạn x2 / x1,5;
+ *  kệ đôi 1,1; tủ đồ đặc biệt 3 / 3; kệ khác 1 / 1 (ShelfObject, ItemTypeBonusShelfObject, prefab). */
+export function shelf_bonus(g, shelf, item) {
+  const p = shelf.prop ? g.prop(shelf.prop) : null;
+  const kind = p !== null && p.kind.k === 'Placed' ? p.kind.a : null;
+  const t = items.ty_of(item);
+  switch (kind) {
+    case game.FRIDGE: return t === T_FOOD ? [4.0, 3.0] : [1.0, 1.0];
+    case game.RACK: return t === T_GUN || t === T_MELEE || t === T_AMMO ? [2.0, 1.5] : [1.0, 1.0];
+    case game.SHELF_DUAL: return [1.1, 1.0];
+    case game.UNIT_SPECIAL: return [3.0, 3.0];
+    default: return [1.0, 1.0];
   }
-  return 0;
 }
 
 // ZKind is a unit enum (a string here); its `impl` methods live in game.rs (`stats`) and combat.rs (`boss`, `label`).
@@ -107,6 +143,9 @@ export function spawn_customer(g, advert) {
   c.advert = advert;
   if (advert !== null) {
     c.goal = { k: 'Buy' };
+    // [GỐC] BuyAdvertisedItemMobGoal: mọi độ thèm bị ghi đè, 10 cho loại của món quảng cáo, 0 cho loại khác.
+    const at = items.ty_of(advert);
+    c.desire = c.desire.map((w, t) => (t === at ? 10.0 : w < 0.0 ? w : 0.0));
   }
   g.customers.push(c);
 }
@@ -114,8 +153,10 @@ export function spawn_customer(g, advert) {
 function new_customer(g) {
   const n = lay.CUSTOMER_SPAWNS.length;
   const spawn = clamp(g.rng.int(0, n - 1), 0, n - 1);
-  const food_mod = g.day === 1 && g.hour() < 15.0 ? 2.0 : 1.0;
-  const desire = [g.rng.range(0.2, 2.05) * food_mod, g.rng.range(0.2, 2.05), g.rng.range(0.2, 2.05), g.rng.range(0.2, 2.05) * 2.0];
+  let desire = roll_desires(g);
+  // [GỐC] Khách liều (BuyItemsMobGoalState.OnEnter): từ ngày 3, 25 %, mọi độ thèm > 1,5 nhân 5.
+  const desperate = g.day > 2 && desire.some((w) => w > 0.0) && g.rng.chance(0.25);
+  if (desperate) desire = desire.map((w) => (w > 1.5 ? w * 5.0 : w));
   const wallet = g.roll_wallet();
   let goal = { k: 'Buy' };
   // Khách bị thương: trọng số 0,025 từ ngày 2 (Mua 1,0; Bán 0,1). ?medic=1 ép khách kế tiếp.
@@ -160,7 +201,7 @@ function new_customer(g) {
     spawn,
     to_queue: false,
     gone: false,
-    desperate: g.day >= 3 && g.rng.chance(0.25),
+    desperate,
     pay_t: 0.0,
     advert: null,
     hp: 100.0,
@@ -182,14 +223,9 @@ function choose_tile(g, c) {
     for (let s = 0; s < g.shelves[sh].slots.length; s++) {
       const it = g.shelves[sh].slots[s];
       if (it !== null && it !== undefined) {
-        let w = c.desire[kind_idx(items.kind_of(it))];
-        if (c.desperate && w > 1.5) {
-          w *= 5.0;
-        }
-        // Quảng cáo của Mobile News Crew: khách tới vì quảng cáo cân nhắc đúng món đó nặng hơn hẳn.
-        if (c.advert === it) {
-          w += 20.0;
-        }
+        // [GỐC] trọng số ô = _desireMultiplier x độ thèm loại (D2); ô <= 0 bị bỏ.
+        let w = c.desire_mul * desire_of(c, it);
+        if (!(w > 0.0)) continue;
         const stand = g.shelves[sh].stand(s);
         const d = stand.distance(c.pos);
         w *= 3.0 / (d * 0.5 + 1.0);
@@ -242,13 +278,23 @@ function evaluate(g, c) {
   const price = g.prices[item];
   const value = items.ival(item);
   const pending = c.basket.reduce((a, b) => a + b[1], 0);
-  let score = game.Game.score(price, value, pending, c.wallet);
-  // Nạp thêm ví một lần khi rất thèm món và giá chưa quá 2,25 lần.
-  if (score <= 0.0 && !c.topped && c.desire[kind_idx(items.kind_of(item))] >= 1.2 && price <= 2.25 * value && g.rng.chance((g.rep + 100.0) / 200.0)) {
-    c.topped = true;
-    c.wallet = trunc(Math.ceil((pending + price) / 0.99)) + g.rng.int(1, 5);
-    score = game.Game.score(price, value, pending, c.wallet);
+  const base = desire_of(c, item);
+  // [GỐC] AffordabilityGate.TryTopUp: chưa đủ ví, rất thèm (>= 1,2), giá / giá trị (chia nguyên) <= 2,25, xác suất (uy tín + 100) /
+  // 200, một lần mỗi khách: nạp đúng phần thiếu, tối đa ceil(giá trị x 2,25).
+  if (!(c.wallet > 0 && pending + price <= c.wallet * 0.99) && !c.topped && base >= 1.2 && value > 0 && trunc(price / value) <= 2.25
+    && g.rng.chance(clamp((clamp(g.rep, -100.0, 100.0) + 100.0) / 200.0, 0.0, 1.0))) {
+    const grant = Math.min(trunc(Math.ceil((price + pending - c.wallet * 0.99) / 0.99)), trunc(Math.ceil(value * 2.25)));
+    if (grant > 0) {
+      c.wallet += grant;
+      c.topped = true;
+    }
   }
+  // [GỐC] Trọng số món = (1 - 0,05 x tỉ lệ ví) x Giá x Ham x Đủ tiền; Ham = độ thèm thô (>= 0) + BuyingChanceMultiplier x sức hút kệ
+  // + 20 nếu là món quảng cáo. Mua với xác suất w / (w + 0,7).
+  const [attract, price_bonus] = shelf_bonus(g, shelf, item);
+  const bcm = skills.mul(g, 'CustomerBuyChanceMultiplier');
+  const want = Math.max(base, 0.0) + (bcm > 0.0 ? bcm : 1.0) * attract + (c.advert === item ? 20.0 : 0.0);
+  const score = game.Game.score(price, value, pending, c.wallet, price_bonus) * want;
   const chance = score / (score + 0.7);
   c.desire_mul -= 0.1;
   if (g.rng.chance(chance)) {
@@ -769,9 +815,7 @@ export function detect_radius(hour) {
 }
 
 export function roam_cap(day, hour) {
-  // [ĐỀ XUẤT phiên 7] Ngày 2 là ngày đầu có zombie lang thang, người chơi mới chỉ có búa: đêm ngày 2 tối đa 3 con
-  // (bản gốc 5). Phiên 4-6 bot flow chết ở đêm ngày 2 nhiều lần vì nhiều con lọt vào quán lúc chạng vạng.
-  if (day === 2) return Math.min(roam_cap(3, hour), hour < 21.6 ? 2 : 3);
+  // Luật gốc (phiên 8 bỏ trần 3 con của đêm ngày 2 phiên 7 theo chủ dự án: "giống bản gốc trước").
   if (day < 2 || hour < 9.6) {
     return 0;
   } else if (hour < 12.0) {
@@ -990,8 +1034,6 @@ function tick_zombies(g, fx, dt) {
         z.cd = cooldown;
         g.door.hp -= 25.0;
         g.play('bang', 0.8);
-        // phiên 8: người chơi trong quán biết có zombie ngoài cửa trước khi mở
-        if (game.Game.in_shop(player) && g.notice_t <= 0.0 && !g.raid.active) g.say('Zombies are banging on the front door!');
         g.fxq.push([fxs.FX_DEBRIS, v3(clamp(z.pos.x, lay.DOOR_BOX[0] + 0.2, lay.DOOR_BOX[2] - 0.2), 1.2, lay.DOOR_BOX[3] + 0.05)]);
         if (g.door.hp <= 0.0) {
           g.door.hp = 0.0;
@@ -1008,9 +1050,7 @@ function tick_zombies(g, fx, dt) {
       z.yaw = turn(z.yaw, yaw_to(to), dt * 8.0);
       if (z.cd <= 0.0) {
         z.cd = cooldown + g.rng.range(0.2, 0.33);
-        // [ĐỀ XUẤT phiên 8] Hulk (cú cào 150, một cú hạ người chơi 100 máu) lấy đà 0,9 s thay vì 0,5 s: đòn to báo trước rõ, người chơi
-        // cẩn thận kịp lùi khỏi tầm 1,7 m. Raid đầu ngày 3 có một Hulk ở đợt cuối; bot flow thua raid đó khi Hulk áp sát (Pages 0e643223c199).
-        z.wind = z.kind === 'Hulk' ? 0.9 : 0.5;
+        z.wind = 0.5;
       }
       continue;
     }
@@ -1199,8 +1239,7 @@ export function zombie_pose(z) {
   const pitch = -fall * fall * 1.45;
   const quat = q_mul(q_mul(q_y(z.yaw), q_z(sway)), q_x(pitch));
   // Vung tay: giơ cao lúc lấy đà rồi bổ xuống.
-  const w0 = z.kind === 'Hulk' ? 0.9 : 0.5; // thời gian lấy đà (phiên 8: Hulk 0,9 s)
-  const reach = z.wind > 0.0 ? -2.6 + (1.0 - z.wind / w0) * 1.6 : -1.35;
+  const reach = z.wind > 0.0 ? -2.6 + (0.5 - z.wind) * 3.2 : -1.35;
   // Dáng đi theo từng con: lết đều, khập khiễng (một chân bước ngắn), kéo lê một chân, chồm tới.
   const gait = z.kind === 'Base' || z.kind === 'Tumour' ? z.seed % 4 : 0;
   const mv = z.moving ? 1.0 : 0.0;
@@ -1430,3 +1469,6 @@ PORT GAPS
   part quats) instead of writing joint Transforms. Mesh code of spawn_body (blob + basket) is described above, not built here.
 - ZKind impl methods (stats/boss/label/scale) are local copies (zk_*), see report.
 */
+
+/** Móc cho node test (three/tools/t-desire.mjs): chọn ô kệ cho một khách. */
+export const __test_choose = (g, c) => choose_tile(g, c);

@@ -115,7 +115,7 @@ function batGeo() {
 // guns for security staff (fin-combat). Gun space: origin at the top of the pistol grip, barrel along +z, y up.
 // Fore-grip / magazine / muzzle points used by robo-rig.js poses: GUN_PTS.
 export const GUN_PTS = {
-  rifle: { fore: [0, -0.012, 0.2], mag: [0, -0.05, 0.1], muzzle: [0, 0.035, 0.42], butt: [0, 0.005, -0.2] },
+  rifle: { fore: [0, -0.012, 0.15], mag: [0, -0.05, 0.1], muzzle: [0, 0.035, 0.42], butt: [0, 0.005, -0.2] },
   pistol: { fore: [0.012, -0.04, -0.004], mag: [0, -0.07, -0.01], muzzle: [0, 0.035, 0.12], butt: [0, 0, 0] },
 };
 function rifleGeo() {

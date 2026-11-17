@@ -159,9 +159,11 @@ export function shot(g, item, eye, dir, ends) {
   if (!(s.class === 'Bow' || s.class === 'Crossbow' || s.class === 'Saw' || s.class === 'Nail')) {
     v.muzzle = [m, dir, 0.055, (s.class === 'Shotgun' || s.class === 'Sniper' || s.class === 'Revolver') ? 1.5 : 1.0];
   }
-  for (const [b, fx_, decal] of ends) {
+  for (const [b, fx_, decal, built] of ends) {
     const dist = Math.max(b.distance(m), 0.5);
-    v.tracers.push(Tracer(m, b.clone(), 0.0, dist / s.speed, kind, fx_, decal));
+    const t = Tracer(m, b.clone(), 0.0, dist / s.speed, kind, fx_, decal);
+    if (built) t.built = true; // dừng ở vật dựng (combat.ray_built): phần nhìn tìm chỗ chạm thật trên lưới, không vết đạn
+    v.tracers.push(t);
   }
   if (v.tracers.length > 96) {
     const n = v.tracers.length - 96;
