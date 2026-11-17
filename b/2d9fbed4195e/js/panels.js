@@ -53,11 +53,10 @@ function jobs(g) {
     const anyLock = [2, 3, 8].some((jt) => !skills.job_unlocked(g, jt));
     c.det_icon = { k: 'Glyph', a: 'Staff' };
     c.det_title = s.name;
-    c.det = `Job: ${jobOf(s)}\nWage: ${s.wage} Batteries a day\nHP: ${Math.max(s.hp, 0).toFixed(0)}\nScavenger: ${stars(s.levels[0])}\nSecurity: ${stars(s.levels[1])}\nService: ${stars(s.levels[2])}\nCleaner: ${stars(s.levels[3])}`;
+    c.det = `Job: ${jobOf(s)}\nWage: ${s.wage} Batteries a day\nHP: ${Math.max(s.hp, 0).toFixed(0)}\nScavenger: ${stars(s.levels[0])}\nSecurity: ${stars(s.levels[1])}\nService: ${stars(s.levels[2])}\nCleaner: ${stars(s.levels[3])}${s.gun ? `\nGun: ${items.iname(s.gun.item)}` : ''}`;
     // phiên 8 đợt 4: các việc giao được nằm dưới lưới (c.below), khung chi tiết chỉ còn chỉ số nên bảng không cao vống
     c.below = `ASSIGN A JOB TO ${s.name.toUpperCase()}\n` +
-      `[1] Home: free\n[2] Service at the till: ${staff.job_cost(g, s.wage + staff.JOB_COST[2])} Batteries${lock(2)}\n[3] Security at the door: ${staff.job_cost(g, s.wage + staff.JOB_COST[3])} Batteries${lock(3)}\n[4] Cleaner (needs Cleaner ★★★): ${staff.job_cost(g, s.wage + staff.JOB_COST[4])} Batteries${lock(8)}\n[X] Dismiss ${s.name}
-[G] ${s.gun ? `Take back the ${items.iname(s.gun.item)}` : 'Hand over the gun you hold (Security shoots with it)'}` +
+      `[1] Home: free\n[2] Service at the till: ${staff.job_cost(g, s.wage + staff.JOB_COST[2])} Batteries${lock(2)}\n[3] Security at the door: ${staff.job_cost(g, s.wage + staff.JOB_COST[3])} Batteries${lock(3)}\n[4] Cleaner (needs Cleaner ★★★): ${staff.job_cost(g, s.wage + staff.JOB_COST[4])} Batteries${lock(8)}\n[X] Dismiss ${s.name}\n[G] ${s.gun ? `Take back the ${items.iname(s.gun.item)}` : 'Hand over the gun you hold (Security shoots with it)'}` +
       (anyLock ? '\n\nLocked jobs open with Management skills [K].' : '');
   }
   c.foot = 'Trips (scavenge, shop, combat) are assigned on the World Map [M]. Jobs end every morning.\n[W / S] select staff    [1-4] assign job    [G] give / take gun    [X] dismiss    [E] close';
@@ -149,7 +148,7 @@ const HELP_KEYS = [
   ['WASD', 'Move'], ['Mouse', 'Look (or arrow keys)'], ['Shift', 'Sprint'], ['Space', 'Jump'],
   ['E', 'Use'], ['hold E', 'Search, sweep, repair, pry, secure'], ['LMB', 'Attack / fire / hold to throw'], ['RMB', 'Take from shelf'],
   ['Q', 'Set price'], ['R', 'Reload, rotate a build, choose stock'], ['X', 'Drop'], ['O', 'Open / close store'],
-  ['1', 'Hands'], ['2', 'Melee'], ['3', 'Gun'], ['4', 'Throwable'], ['F', 'Heal'], ['B', 'Quick barbed wire'],
+  ['1', 'Hands'], ['2', 'Melee'], ['3', 'Gun'], ['4', 'Throwable'], ['F', 'Heal'], ['B', 'Bin a coin'],
   ['Tab', 'Backpack (equip, build, learn, paint)'], ['K', 'Skills'], ['M', 'World map'], ['U', 'Upgrade (bench, bed, shredder...)'],
   ['hold V', 'Pick up a placed object'], ['L', 'This help'], ['P', 'Settings'],
 ];

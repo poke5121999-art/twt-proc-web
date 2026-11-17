@@ -1,7 +1,7 @@
 //! Món hàng: mọi món là một chỉ số trong danh mục 229 món của bản gốc (`catalog.rs`), số liệu dùng ở `data.rs`.
 //! File này gom tên, giá trị, nhóm thèm của khách, hình dáng thủ tục, việc nhận món, và vũ khí đang trang bị (độ bền, băng đạn).
-//! `[ĐỀ XUẤT]`: khách chỉ có 4 nhóm thèm (đồ ăn, vật liệu, thuốc, vũ khí) nên 14 loại món của bản gốc được gộp về 4 nhóm đó;
-//! hình dáng món sinh theo loại + băm tên vì repo không có model.
+//! Phiên 9: khách thèm theo đúng 14 loại món của bản gốc (`ty_of`, xem actors.ITEM_TYPES); trước đây gộp về 4 nhóm.
+//! `[ĐỀ XUẤT]`: hình dáng món sinh theo loại + băm tên vì repo không có model.
 // Port of src/items.rs (see three/PORT-CONTRACT.md).
 
 import { trunc } from './vec.js';
@@ -59,13 +59,10 @@ export function ival(i) {
   return CAT[i].value;
 }
 
-export function kind_of(i) {
-  switch (CAT[i].ty) {
-    case 5: case 9: return 'Food';
-    case 7: return 'Medical';
-    case 0: case 4: case 6: case 8: case 12: return 'Weapon';
-    default: return 'Crafting';
-  }
+/** Loại món của bản gốc (0 Ammo, 1 Appliance, 2 Crafting, 3 Decoration, 4 Defence, 5 Food, 6 Gun, 7 Medicine, 8 Melee, 9 Seeds,
+ *  10 Shop, 11 Survival, 12 Throwable, 13 Tool): chỉ số trong độ thèm của khách. */
+export function ty_of(i) {
+  return CAT[i].ty;
 }
 
 export function heal_of(i) {

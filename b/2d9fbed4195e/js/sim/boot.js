@@ -32,12 +32,6 @@ export function clock_system(g, dt) {
   if (regen > 0.0 && g.since_hit > 5.0 && g.hp < g.hp_max) {
     g.hp = Math.min(g.hp + regen * dt, g.hp_max);
   }
-  // [ĐỀ XUẤT phiên 8] Hồi sức tự nhiên: 8 giây không bị đánh thì hồi 0,5 máu / giây, chỉ tới 75 % máu tối đa (trên mức đó cần
-  // băng gạc, thuốc, ngủ hay nút kỹ năng PlayerHealOverTime). Lý do: máu không hồi trong ngày nên mỗi trận ban ngày ngày 2 trừ
-  // thẳng vào đêm 2; bot flow / week chết đêm 2 với 25-50 máu còn lại sau các trận buổi chiều (Pages 612e3eeb72f0).
-  if (g.since_hit > 8.0 && g.hp > 0.0 && g.hp < g.hp_max * 0.75) {
-    g.hp = Math.min(g.hp + 0.5 * dt, g.hp_max * 0.75);
-  }
 }
 
 // Rust `str::parse` is strict (no surrounding spaces, no trailing junk); these return null where Rust returns Err.

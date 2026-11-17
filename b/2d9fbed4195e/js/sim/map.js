@@ -313,7 +313,9 @@ export function trip_minute(g, si) {
     default: {
       const danger = Math.max(lmd(i).danger_value, 0.1);
       const cm = skills.mul(g, 'StaffCombatPowerMultiplier');
-      const prof = Math.max(g.staff[si].levels[1], 1.0) * (cm > 0.0 ? cm : 1.0);
+      // gốc CalculateCombatPower: hệ số x (cơ bản + CombatProficiency vũ khí + vũ khí mạnh nhất x 0,01); cơ bản ở đây là cấp Security
+      const gp = g.staff[si].gun !== null && g.staff[si].gun !== undefined ? staff.gun_proficiency(g.staff[si].gun.item) * 1.01 : 0.0;
+      const prof = Math.max(g.staff[si].levels[1] + gp, 1.0) * (cm > 0.0 ? cm : 1.0);
       const rs = clamp(prof / danger, 0.25, 5.0);
       g.lm_hp[i] = Math.max(g.lm_hp[i] - rs * 0.1, 0.0);
       g.staff[si].hp -= (0.5 / rs) * 1.25;

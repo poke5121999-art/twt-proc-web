@@ -364,7 +364,12 @@ export async function install(G) {
     const a = V(t.a.x, t.a.y, t.a.z), b = V(t.b.x, t.b.y, t.b.z);
     const clip = clipSeg(a, b);
     // only bullets that end on the world (fx set) can stop on a built thing; a zombie hit is the rules' call
-    const built = t.fx !== null && t.fx !== undefined && G.params.builtfix !== '0' ? builtHit(a, clip ? clip.p : b) : null;
+    let built = t.fx !== null && t.fx !== undefined && G.params.builtfix !== '0' ? builtHit(a, clip ? clip.p : b) : null;
+    if (t.built && !built) {
+      // the rules stopped the bullet on a built object's box (combat.ray_built): find the mesh inside the box, else the box face
+      const dir = b.clone().sub(a).normalize();
+      built = builtHit(a, b.clone().addScaledVector(dir, 1.6)) || { p: b.clone(), n: dir.clone().negate(), metal: t.fx === fxs.FX_SPARK, prop: -1 };
+    }
     tracerReg.set(t, { a, b, kind: t.kind, seen: G.t, clip, built });
     if (t.kind === 0 || t.kind === 3) { fx.tracer(a, built ? built.p : clip ? clip.p : b, { speed: Math.max(60, a.distanceTo(b) / Math.max(t.dur, 1e-3)), width: t.kind === 3 ? 0.012 : 0.024, intensity: t.kind === 3 ? 6 : 16, trail: t.kind === 0 }); stats.tracers++; }
   }

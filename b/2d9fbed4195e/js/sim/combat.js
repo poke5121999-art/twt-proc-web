@@ -32,8 +32,10 @@ import * as skills from './skills.js';
 import * as world from './world.js';
 import * as fx from './fx.js';
 import * as fp from './fp.js';
+import * as web from './web.js';
 import * as actors from './actors.js';
 import * as cine from './cine.js';
+import * as build from './build.js';
 
 export class State {
   constructor() {
@@ -218,6 +220,47 @@ export function hit_zombie(g, i, dmg, head, stun, knock, dir) {
   // XP Survival theo sát thương gây ra (luật gốc: RoundToInt(sát thương x 0,125)), cộng lúc zombie chết ở actors.rs.
 }
 
+/// Độ cao hộp chặn đạn của vật dựng đặt trên sàn (m) [ĐỀ XUẤT: đo theo hình `models.placed`].
+function built_h(item) {
+  if (build.shelf_dims(item) !== null) return item === game.FRIDGE ? 2.0 : 1.9;
+  switch (item) {
+    case game.SPIKE_WALL: return 0.9;
+    case game.TURRET: case game.AUTO_MINIGUN: return 1.25;
+    case game.TABLE_SECURE: return 0.95;
+    case game.EXPLOSIVE_BARREL: return 1.0;
+  }
+  return 1.0;
+}
+
+/// Vật dựng (Placed / dây thép gai) đầu tiên tia đạn chạm (hộp chân x độ cao) trong tầm `max`: [t, id] | null. Thảm, đồ treo
+/// tường / trần, bẫy kẹp, bom điều khiển, bóng bay không chặn đạn; thùng nổ do `ray_explosive` lo.
+export function ray_built(g, o, d, max) {
+  let best = null;
+  const inv = v3(1.0 / (d.x + 1e-6), 1.0 / (d.y + 1e-6), 1.0 / (d.z + 1e-6));
+  for (const p of g.props) {
+    if (p.dead) continue;
+    let box, h;
+    if (p.kind.k === 'Wire') {
+      box = build.prop_box(game.BARBED, p.pos, p.yaw); h = 1.0;
+    } else if (p.kind.k === 'Placed') {
+      const it = p.kind.a;
+      const [, , solid, high] = build.footprint(it);
+      if (high !== 0 || is_explosive_placed(p.kind) || it === game.BEAR_TRAP || it === game.BALLOON) continue;
+      if (!solid && it !== game.SPIKE_WALL) continue;
+      if (g.bld.mounted === p.id) continue;
+      box = build.prop_box(it, p.pos, p.yaw); h = built_h(it);
+    } else continue;
+    const mn = v3(box[0], 0.0, box[1]), mx = v3(box[2], h, box[3]);
+    const t0 = mn.sub(o).mulv(inv), t1 = mx.sub(o).mulv(inv);
+    const lo = t0.min(t1), hi = t0.max(t1);
+    const tn = Math.max(Math.max(lo.x, lo.y), lo.z), tf = Math.min(Math.min(hi.x, hi.y), hi.z);
+    if (tf >= Math.max(tn, 0.0) && tn > 0.05 && tn < (best !== null ? best[0] : max)) {
+      best = [tn, p.id];
+    }
+  }
+  return best;
+}
+
 /// Vật dựng nổ được nằm trên tia nhìn trong tầm `max`.
 function ray_explosive(g, o, d, max) {
   const k = g.props.findIndex((p) => {
@@ -234,6 +277,7 @@ function ray_explosive(g, o, d, max) {
 
 /// Đập báng súng (Z, [ĐỀ XUẤT], không có trong luật gốc): như một đòn cận chiến nhẹ (sát thương thấp, đẩy lùi mạnh,
 /// choáng), trúng ở khoảng 0,15 s của động tác 0,5 s (`fp.pose`: đỉnh cú thúc ở 0,19 s).
+const bash_on = () => web.query('bash') === '1';
 export const BASH = { dur: 0.5, hit_at: 0.15, w: { dmg: 15.0, cd: 0.5, range: 1.3, dur: 100.0, deg: 0.1, knock: 6.0, stun: 0.9, auto: false } };
 
 function melee_hit(g, inp, item, bash) {
@@ -382,9 +426,18 @@ function fire(g, inp, item) {
     let left = pierce ? 24 : 1;
     let from = 0.0;
     let end = null;
+    // Vật dựng chắn trước zombie thì đạn dừng ở vật dựng (vụn / tia lửa, không vết đạn: `fp.shot` đánh dấu `built`).
+    const bh = ray_built(g, inp.eye, d, max);
+    const wall_t = (() => { const rw = fp.ray_world(g, inp.eye, d, max); return rw !== null ? rw[0] : Infinity; })();
+    const stop = bh !== null && bh[0] < wall_t ? bh[0] : Infinity;
     while (left > 0) {
       left -= 1;
-      const hit = ray_zombie(g, inp.eye.add(d.mul(from)), d, max - from);
+      let hit = ray_zombie(g, inp.eye.add(d.mul(from)), d, max - from);
+      if (hit !== null && from + hit[1] > stop) hit = null;
+      if (hit === null && stop < Infinity && (end === null || pierce)) {
+        end = [inp.eye.add(d.mul(stop)), built_fx(g, bh[1]), false, true];
+        break;
+      }
       if (hit === null) {
         const k = ray_explosive(g, inp.eye, d, max);
         if (k !== null) {
@@ -419,6 +472,15 @@ function fire(g, inp, item) {
   }
   g.cb.acc = clamp(g.cb.acc - 0.25, 0.25, 0.8);
   wear(g, w.deg * dur_mul(g));
+}
+
+/// Hiệu ứng khi đạn chạm vật dựng: tia lửa cho đồ kim loại / dây thép gai, vụn gỗ cho phần còn lại.
+export function built_fx(g, id) {
+  const p = g.prop(id);
+  if (p === null) return fx.FX_DEBRIS;
+  if (p.kind.k === 'Wire') return fx.FX_SPARK;
+  const it = p.kind.a;
+  return [game.SHELF_SECURE, game.TABLE_SECURE, game.UNIT_SPECIAL, game.FRIDGE, game.RACK, game.TURRET, game.AUTO_MINIGUN].includes(it) ? fx.FX_SPARK : fx.FX_DEBRIS;
 }
 
 /// Ném món đang chọn với mức nạp hiện tại. (Rust `throw`; renamed: reserved word in JS.)
@@ -527,7 +589,9 @@ export function player_weapons(g, inp) {
   if (gg === null) return;
   const [gw, gd] = gg;
   // Đập báng (Z): không khi đang nạp đạn (khớp `fp.pose`); trong cú đập không bắn.
-  if (inp.bash && g.cb.bash_t <= 0.0 && g.cb.reload_t <= 0.0) {
+  // Phiên 8, theo luật gốc (chủ dự án: "giống bản gốc trước"): bản gốc không có đòn đập báng gây sát thương; Z chỉ còn là
+  // dáng tay của fp.pose như trước. `?bash=1` bật lại đòn đập của fin-combat để thử.
+  if (bash_on() && inp.bash && g.cb.bash_t <= 0.0 && g.cb.reload_t <= 0.0) {
     g.cb.bash_t = BASH.dur;
     g.cb.bash_hit = false;
   }

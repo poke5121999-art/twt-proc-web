@@ -216,8 +216,12 @@ export class RoboBody {
     const a = sstep(0, 1, I.aim), k = I.kick, r = I.reload, rb = bump(r, 0.0, 0.15, 0.85, 1.0);
     const g = p.gun || (p.gun = { pos: V(), rot: V() });
     if (rifle) {
-      _v.set(-sx * 0.35, sy - A * 0.42, T.d + 0.1).lerp(_v2.set(-sx * 0.62, sy - 0.005, T.d + 0.14), a);
-      g.rot.set(lerp(0.55, 0.0, a), lerp(0.55, 0.05, a), lerp(0.2, 0.0, a));
+      // aim: butt pad against the right shoulder (robot arms are short, so the stock sets the pose, not the reach), barrel
+      // turned a little toward the body line so the left hand gets to the magazine well / handguard
+      const ay = 0.22, by = sy - 0.035, bz = T.d * 0.55;
+      _v2.set(-sx * 0.85 + 0.2 * Math.sin(ay), by + 0.005, bz + 0.2 * Math.cos(ay)); // grip = butt + stock length along the barrel
+      _v.set(-sx * 0.35, sy - A * 0.42, T.d + 0.1).lerp(_v2, a);
+      g.rot.set(lerp(0.55, 0.0, a), lerp(0.55, ay, a), lerp(0.2, 0.0, a));
     } else {
       _v.set(-sx * 0.75, sy - A * 0.62, T.d * 0.5 + 0.06).lerp(_v2.set(-sx * 0.2, sy - 0.02, T.d + A * 0.7), a);
       g.rot.set(lerp(1.15, 0.0, a), lerp(0.1, 0.12, a), 0);
@@ -234,7 +238,7 @@ export class RoboBody {
     for (let it = 0; it < 2; it++) {
       const w = _v3.set(0, rifle ? 0.012 : 0.0, rifle ? -0.035 : -0.042).applyQuaternion(_q).add(g.pos).sub(_v2.set(-sx, sy, sz)), wl = w.length();
       if (wl > reach) g.pos.addScaledVector(w, reach / wl - 1);
-      if (rifle || a > 0.3) {
+      if ((rifle && a < 0.5) || (!rifle && a > 0.3)) {
         const f = pt(P.fore).sub(_v2.set(sx, sy, sz)), fl = f.length();
         if (fl > reach) g.pos.addScaledVector(f, reach / fl - 1);
       }

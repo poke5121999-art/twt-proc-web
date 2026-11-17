@@ -13,10 +13,19 @@
 //!   hết máu thì chết và mất khỏi danh sách.
 //! `[ĐỀ XUẤT]` và chưa có: sát thương bảo vệ 25 mỗi giây x hệ số (bản gốc dùng vũ khí đang cầm); tinh thần (lương / rượu),
 //! mặc cả của Service cấp 2, chỉnh lương, nhắc lại việc hôm qua, ô đồ của nhân viên.
-//! Súng cho nhân viên (bản gốc: StaffMobObject.TryEquipWeapon; ở đây `[ĐỀ XUẤT]` rút gọn): trên Job Board phím [G] trao khẩu súng
-//! đang cầm cho nhân viên đang chọn (một khẩu mỗi người), bấm lại thì lấy về. Bảo vệ có súng đứng trong tầm bắn (tối đa 14 m),
-//! giương súng ~0,25 s rồi bắn theo nhịp của súng (chậm nhất 0,3 s / phát), trúng 55 % + 8 % mỗi cấp Security, hết băng thì nạp
-//! theo thời gian nạp của súng. Đạn của nhân viên không lấy từ ba lô người chơi. Nhân viên chết thì súng rơi xuống đất.
+//! Súng cho nhân viên: trên Job Board phím [G] trao khẩu súng đang cầm cho nhân viên đang chọn (một khẩu mỗi người), bấm lại
+//! thì lấy về. Luật gốc (`D:/walking-trade-ref/il2csharp-out/Runtime/Runtime`):
+//! - `StaffMobObject.TryEquip...`: từ chối súng có `CanMobsEquip` = 0 (Makeshift Bow) và súng có độ hiếm >= `WeaponRarityCap`
+//!   (mặc định 3, nút kỹ năng "Weapon Rarity Unlock" +3): ngày đầu nhân viên chỉ cầm được súng hiếm 0-2.
+//! - `MobWeaponHandler.StartVirtualReload / TickReload`: nạp "ảo", hết `ReloadTime` thì băng đầy `ClipSize`, không trừ đạn trong
+//!   kho người chơi. Không có độ bền trong `MobWeaponHandler` / `MobInventory` (giữ `BaseWeaponData`, không giữ món có độ bền),
+//!   nên súng nhân viên không mòn.
+//! - `StaffMobObject.CalculateCombatPower`: sức đánh = hệ số x (BaseCombatPower + tổng `CombatProficiency` vũ khí + vũ khí mạnh
+//!   nhất x 0,01) x 100; `CombatBarrierOverworldLandmark` dùng max(1, sức đánh / 100) cho chuyến Combat (`map.trip_minute`).
+//! - Chết: `OnDied` dựng ragdoll mang `MobInventory.GetLootEntries()` (súng lục được từ xác); ở đây súng rơi ra đất cạnh chỗ chết.
+//!   Bản gốc không có việc nhân viên tự nhặt vũ khí trên sàn (chỉ PickUpAmmo cho tháp súng), nên ở đây cũng không.
+//! `[ĐỀ XUẤT]` (gốc chạy theo `MobWeaponHandler` + AI tầm nhìn riêng): đứng trong tầm bắn (tối đa 14 m), giương ~0,25 s, bắn theo
+//! nhịp súng (chậm nhất 0,3 s / phát), trúng 55 % + 8 % mỗi cấp Security.
 
 import { Vec3, v3, Y, trunc, clamp } from './vec.js';
 import * as actors from './actors.js';
@@ -24,6 +33,7 @@ import * as game from './game.js';
 import * as lay from './lay.js';
 import * as world from './world.js';
 import * as skills from './skills.js';
+import * as data from './data.js';
 import * as map from './map.js';
 import * as build from './build.js';
 import * as fx from './fx.js';
@@ -120,10 +130,29 @@ export class Staff {
   }
 }
 
-/// Súng nhân viên dùng được: súng bắn đạn thường (không súng phun lửa, không súng phóng tên lửa).
-export function staff_gun_ok(item) {
-  const gg = items.gun(item);
-  return gg !== null && gg[1].clip > 0 && gg[1].ammo !== 78;
+/// `CombatProficiency` (= `CombatPower`) của súng trong các `*WeaponData.asset` gốc; `CanMobsEquip` = 0 ghi là null.
+export const GUN_PROFICIENCY = {
+  'AK-47': 6, 'Turret Minigun': 7, 'Bone Revolver': 4, 'Makeshift Bow': null, 'Crossbow': 3.2, 'Flamethrower': 8, 'Minigun': 7,
+  'Modded NailGun': 4.2, 'Sidearm Pistol': 3, 'Missile Launcher': 10, 'Saw Launcher': 10, 'Pump-Action Shotgun': 5.5,
+  'Sniper Rifle': 8, 'Uzi': 3.4,
+};
+export function gun_proficiency(item) {
+  const v = GUN_PROFICIENCY[items.iname(item)];
+  return v === undefined || v === null ? 0.0 : v;
+}
+/// Trần độ hiếm vũ khí của nhân viên (gốc `WeaponRarityCap` 3 + nút kỹ năng StaffWeaponRarityCap).
+export function rarity_cap(g) {
+  return 3 + trunc(skills.sum(g, 'StaffWeaponRarityCap'));
+}
+/// Lý do nhân viên không cầm được súng `item`, null nếu được.
+export function staff_gun_refusal(g, item) {
+  if (items.gun(item) === null) return 'not a gun';
+  if (GUN_PROFICIENCY[items.iname(item)] === null) return 'cannot use';
+  if (data.INFO[item].rarity >= rarity_cap(g)) return 'too rare';
+  return null;
+}
+export function staff_gun_ok(item, g) {
+  return g === undefined ? items.gun(item) !== null && GUN_PROFICIENCY[items.iname(item)] !== null : staff_gun_refusal(g, item) === null;
 }
 
 /// Kiểu cầm cho phần nhìn: 'pistol' (súng ngắn, súng lục) hay 'rifle' (súng dài).
@@ -154,9 +183,10 @@ export function give_gun(g) {
     g.say('Hold a gun [3] to hand it over.');
     return;
   }
-  if (!staff_gun_ok(w.item)) {
+  const why = staff_gun_refusal(g, w.item);
+  if (why !== null) {
     g.play('deny', 0.4);
-    g.say(`${s.name} cannot use the ${items.iname(w.item)}.`);
+    g.say(why === 'too rare' ? `The ${items.iname(w.item)} is too rare for staff (unlock Weapon Rarity in the skills).` : `${s.name} cannot use the ${items.iname(w.item)}.`);
     return;
   }
   s.gun = { item: w.item, clip: w.clip, dur: w.dur };
@@ -184,14 +214,40 @@ function staff_shoot(g, s, zi, zp, dmg_mul) {
   const m = muzzle(s);
   const z = g.zombies[zi];
   const at = zp.add(Y.mul(1.1 * combat.scale(z.kind)));
-  const hit = g.rng.chance(clamp(0.55 + 0.08 * (s.levels[1] - 1.0), 0.0, 0.95));
-  s.gun.clip -= 1;
+  s.gun.clip = Math.max(s.gun.clip - 1, 0);
   s.shots += 1;
+  const dmul = (1.0 + 0.1 * (s.levels[1] - 1.0)) * dmg_mul;
+  if (gd.clip === 0) {
+    // súng phun lửa: đốt zombie đang nhắm (như người chơi: sát thương x nhịp, cháy 5 s)
+    if (s.shots % 3 === 1) g.play('flame', 0.4);
+    z.hp -= gw.dmg * Math.max(gw.cd, 0.3) * dmul;
+    z.burn = 5.0;
+    z.chasing = true;
+    g.fxq.push([fx.FX_SPARK, m.add(at.sub(m).normalize_or_zero().mul(1.5))]);
+    return;
+  }
+  if (gd.ammo === 78) {
+    // tên lửa bay thật (fp.rocket), nổ khi chạm
+    g.play('shot', 0.5);
+    fp.rocket(g, s.gun.item, m, at.sub(m).normalize_or_zero(), gw.dmg * dmul);
+    return;
+  }
+  const hit = g.rng.chance(clamp(0.55 + 0.08 * (s.levels[1] - 1.0), 0.0, 0.95));
   g.play('shot', 0.45);
   const np = Math.max(gd.pellets, 1);
   let end;
+  // vật dựng chắn giữa nòng và zombie: đạn dừng ở đó (combat.ray_built), như đạn người chơi
+  const aim = at.sub(m), alen = aim.length();
+  const bh = combat.ray_built(g, m, aim.normalize_or_zero(), alen);
+  if (bh !== null) {
+    end = [m.add(aim.normalize_or_zero().mul(bh[0])), combat.built_fx(g, bh[1]), false];
+    const t = fp.Tracer(m, end[0].clone(), 0.0, Math.max(bh[0], 0.5) / 300.0, 0, end[1], false);
+    t.built = true;
+    g.fx2.tracers.push(t);
+    return;
+  }
   if (hit) {
-    const dmg = gw.dmg * np * (1.0 + 0.1 * (s.levels[1] - 1.0)) * dmg_mul;
+    const dmg = gw.dmg * np * dmul;
     combat.hit_zombie(g, zi, dmg, false, gw.stun, gw.knock * 0.5, at.sub(m));
     role_xp(s, 1, Math.max(dmg * 0.0125, 0.5));
     end = [at, null, false];
@@ -616,7 +672,7 @@ export function tick_staff(g, dt) {
               s.reload = 0.0;
               s.gun.clip = gd.clip;
             }
-          } else if (s.gun.clip <= 0 || (target === null && s.gun.clip < gd.clip)) {
+          } else if (gd.clip > 0 && (s.gun.clip <= 0 || (target === null && s.gun.clip < gd.clip))) {
             s.reload = gd.reload;
             g.play('reload', 0.35);
           }
@@ -637,7 +693,7 @@ export function tick_staff(g, dt) {
             } else {
               s.aim = Math.min(s.aim + dt * 4.0, 1.0);
               s.timer += dt;
-              if (s.reload <= 0.0 && s.gun.clip > 0 && s.aim >= 0.95 && s.timer >= Math.max(gw.cd, 0.3)) {
+              if (s.reload <= 0.0 && (s.gun.clip > 0 || gd.clip === 0) && s.aim >= 0.95 && s.timer >= Math.max(gw.cd, 0.3) && (gd.clip > 0 || d.length() < 8.0)) {
                 s.timer = 0.0;
                 staff_shoot(g, s, zi, zp, sec_dmg);
               }
@@ -697,7 +753,16 @@ export function tick_staff(g, dt) {
             const [id, cp] = corpse;
             const d = v3(cp.x - s.pos.x, 0.0, cp.z - s.pos.z);
             if (d.length() > 1.2) {
-              s.pos = world.resolve(g, s.pos.add(d.normalize().mul(2.5 * clean_speed * dt)), 0.3);
+              // Phiên 9: đi theo đường qua cửa (actors.route) thay vì đường thẳng: xác ở ngoài, lao công trong quán thì đường thẳng
+              // dính tường quán và kẹt mãi (bot staff 1 / 3 lượt hết giờ chờ dọn xác). Bản gốc đi bằng NavMesh.
+              const wp = actors.route(s.pos, cp);
+              const dw = v3(wp.x - s.pos.x, 0.0, wp.z - s.pos.z);
+              const dir = dw.length() > 0.05 ? dw.normalize() : d.normalize();
+              const np = s.pos.add(dir.mul(Math.min(2.5 * clean_speed * dt, Math.max(dw.length(), 0.01))));
+              // Đang qua cửa (điểm kế tiếp khác xác): đi như mọi nhân viên theo đường (walk, không va chạm) để cửa trước đóng
+              // không chặn; cùng vùng với xác thì vẫn tránh vật cản.
+              const in_door = Math.abs(np.x - lay.DOOR_OUT.x) < 0.9 && np.z > lay.DOOR_IN.z - 0.5 && np.z < lay.DOOR_OUT.z + 0.3;
+              s.pos = wp === cp && !in_door ? world.resolve(g, np, 0.3) : np;
               s.yaw = Math.atan2(-d.x, -d.z);
               s.moving = true;
               s.phase += dt * 8.0;

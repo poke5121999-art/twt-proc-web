@@ -805,24 +805,6 @@ export function press_e(g, t) {
       }
       g.door.open = !g.door.open;
       g.play('door', 0.6);
-      // [ĐỀ XUẤT phiên 8] Mở cửa đúng lúc zombie đang đập cửa: cánh cửa hất chúng lùi 0,9 m và choáng 1,2 s, đủ để người chơi
-      // đóng lại hay đánh trước. Trước đây hai con đứng sát cửa cào ngay khi mở (100 máu mất trong ~6 s, bot flow chết 1 / 4).
-      if (g.door.open) {
-        let n = 0;
-        for (const z of g.zombies) {
-          if (z.dead || z.hp <= 0.0 || combat.zkind_boss(z.kind) || z.kind === 'Hulk' || z.kind === 'Brute') continue;
-          if (z.pos.z > lay.DOOR.z && z.pos.distance(lay.DOOR_OUT) < 1.9) {
-            z.pos = v3(z.pos.x, z.pos.y, z.pos.z + 0.9);
-            z.stagger = Math.max(z.stagger, 1.2);
-            z.wind = 0.0;
-            n += 1;
-          }
-        }
-        if (n > 0) {
-          g.play('bang', 0.8);
-          g.say(n > 1 ? `The door knocks ${n} zombies back! Close it [E] or fight.` : 'The door knocks a zombie back! Close it [E] or fight.');
-        }
-      }
       break;
     case 'BedDoor': g.say(g.has_hammer() ? 'It is jammed. Hit it with the hammer (LMB).' : 'It is jammed. Find a hammer.'); break;
     case 'Radio':
@@ -1663,27 +1645,8 @@ export function player_system(g, dt_raw, ctx) {
     }
     g.play('drop', 0.5);
   }
-  // Dựng nhanh dây thép gai: giữ B 2 giây, tốn 2 Wiring + 2 Nails [ĐỀ XUẤT] (bản gốc chế ở bàn cấp 2 rồi dựng).
-  const on_coin = target.k === 'Coin';
-  if (keys.pressed('KeyB') && !on_coin) {
-    if (g.inv[game.WIRING] >= 2 && g.inv[game.NAILS] >= 2) {
-      feel.build_t += dt;
-      g.prompt = `Building barbed wire... ${(feel.build_t / 2.0 * 100.0).toFixed(0)}%`;
-      if (feel.build_t >= 2.0) {
-        feel.build_t = 0.0;
-        g.inv[game.WIRING] -= 2;
-        g.inv[game.NAILS] -= 2;
-        const spot = g.player.add(flat_f.mul(1.6));
-        g.add_prop({ k: 'Wire', a: 300.0 }, v3(spot.x, 0.0, spot.z), g.yaw);
-        g.play('place', 0.8);
-        g.say('Barbed wire placed.');
-      }
-    } else if (keys.just_pressed('KeyB')) {
-      g.say('Barbed wire needs 2 Wiring and 2 Nails.');
-    }
-  } else {
-    feel.build_t = 0.0;
-  }
+  // Phiên 9: bỏ phím B dựng nhanh dây thép gai (không có trong bản gốc). Dây thép gai chế ở bàn cấp 2 (Scrappy Wiring 2 +
+  // Nails 2, công thức từ nút kỹ năng Barbed Wire hoặc tờ công thức) rồi dựng từ ba lô như mọi món dựng. B chỉ còn bỏ pin vào thùng.
   if (keys.just_pressed('KeyB') && target.k === 'Coin') {
     const i = target.a;
     const c = g.pay !== null && i < g.pay.coins.length ? g.pay.coins[i] : null;

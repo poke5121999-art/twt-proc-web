@@ -26,8 +26,6 @@ export const DAY_SECS = 800.0;
 /// Phút game trên một giây thật ở tốc độ 1.
 export const MIN_PER_SEC = 1440.0 / DAY_SECS;
 
-export const Kind = Object.freeze({ Food: 'Food', Crafting: 'Crafting', Medical: 'Medical', Weapon: 'Weapon' });
-export const KIND_ORDER = ['Food', 'Crafting', 'Medical', 'Weapon'];
 
 // Chỉ số trong danh mục (catalog.rs) của các món được gọi tên trong code.
 export const TIN = 210;
@@ -458,7 +456,7 @@ export class Customer {
     this.goal = { k: 'Buy' };
     this.timer = 0.0;
     this.wallet = 0;
-    this.desire = [0, 0, 0, 0];
+    this.desire = new Array(14).fill(-1.0); // độ thèm theo 14 loại món (actors.ITEM_TYPES)
     this.desire_mul = 0.0;
     this.basket = [];
     this.slot = null;
@@ -1290,7 +1288,7 @@ export class Game {
       }
     }
     if (this.raid.active) {
-      return '[2] melee  [3] gun  [4] throwable     [LMB] attack     [F] heal     [B] barbed wire     [hold E] repair the door';
+      return '[2] melee  [3] gun  [4] throwable     [LMB] attack     [F] heal     [hold E] repair the door';
     }
     const q = CHAIN.find((q) => !this.is_done(q));
     switch (q === undefined ? null : q) {
@@ -1439,13 +1437,14 @@ export class Game {
   }
 
   /// Điểm của một món với một khách: (1 − 0,05×ratio) × P × A.
-  static score(price, value, pending, wallet) {
+  /** [GỐC] Giá x Đủ tiền x (1 - 0,05 x tỉ lệ ví). `bonus` = hệ số giá của kệ: nới trần giá lên max(2,25; (bonus - 1) x 0,5 + 2,25). */
+  static score(price, value, pending, wallet, bonus = 1.0) {
     const cap = 0.99 * wallet;
-    if (pending + price > cap) {
+    if (wallet <= 0 || pending + price > cap || price <= 0 || value <= 0) {
       return 0.0;
     }
     const ratio = price / Math.max(value, 1);
-    const max_markup = 2.25;
+    const max_markup = Math.max(2.25, (bonus - 1.0) * 0.5 + 2.25);
     if (ratio > max_markup) {
       return 0.0;
     }
