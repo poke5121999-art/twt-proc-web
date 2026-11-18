@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
+<script src="/survivor-web-hub/js/feedback-capture.js?v=20261118a"></script>
+<script>
+// Phím báo lỗi F9 của hub: kèm trạng thái game lúc bấm (số, chữ, bool ở tầng đầu của window.__twt).
+window.hubFeedbackState = function () {
+  var t = window.__twt || {}, s = {};
+  for (var k in t) { var v; try { v = t[k]; } catch (e) { continue; } if (v === null || /^(number|string|boolean)$/.test(typeof v)) s[k] = v; }
+  return { build: window.__build, errors: (window.__errors || []).slice(-20), twt: s };
+};
+</script>
 <title>The Walking Trade (bản chỉ code)</title>
 <script>
 // Bộ thu lỗi đặt đầu trang: mọi lỗi console / lỗi không bắt đều vào window.__errors để bot và người chơi thấy.
