@@ -1,24 +1,20 @@
 <!doctype html>
 <html lang="vi">
 <head>
+<script>
+// Hub F9 feedback kit (survivor-web-hub js/feedback-capture.js): only on the Pages host where /survivor-web-hub/ exists;
+// a local server has no hub, and the 404 would count as a page error for the bots. window.hubFeedbackState: js/plug/feedback.js.
+if (/github\.io$/.test(location.hostname)) document.write('<script src="/survivor-web-hub/js/feedback-capture.js?v=20261118a"><\/script>');
+</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<script src="/survivor-web-hub/js/feedback-capture.js?v=20261118a"></script>
-<script>
-// Phím báo lỗi F9 của hub: kèm trạng thái game lúc bấm (số, chữ, bool ở tầng đầu của window.__twt).
-window.hubFeedbackState = function () {
-  var t = window.__twt || {}, s = {};
-  for (var k in t) { var v; try { v = t[k]; } catch (e) { continue; } if (v === null || /^(number|string|boolean)$/.test(typeof v)) s[k] = v; }
-  return { build: window.__build, errors: (window.__errors || []).slice(-20), twt: s };
-};
-</script>
 <title>The Walking Trade (bản chỉ code)</title>
 <script>
 // Bộ thu lỗi đặt đầu trang: mọi lỗi console / lỗi không bắt đều vào window.__errors để bot và người chơi thấy.
 window.__errors = [];
 window.__t0 = performance.now();
-window.__build = 'f8b76695248a';
+window.__build = '808ab56f5b36';
 (function () {
   var oe = console.error;
   console.error = function () {
@@ -29,8 +25,8 @@ window.__build = 'f8b76695248a';
   window.addEventListener('unhandledrejection', function (e) { window.__errors.push('rejection: ' + (e.reason && e.reason.message || e.reason)); });
 })();
 </script>
-<link rel="stylesheet" href="b/f8b76695248a/css/page.css?v=f8b76695248a">
-<link rel="stylesheet" href="b/f8b76695248a/css/hud.css?v=f8b76695248a">
+<link rel="stylesheet" href="b/808ab56f5b36/css/page.css?v=808ab56f5b36">
+<link rel="stylesheet" href="b/808ab56f5b36/css/hud.css?v=808ab56f5b36">
 </head>
 <body class="loading">
 <div id="twt-view"><canvas id="twt-canvas" tabindex="0"></canvas></div>
@@ -61,7 +57,7 @@ window.__build = 'f8b76695248a';
     <button id="go" disabled>Vào game</button>
     <pre id="fatal"></pre>
     <div class="foot">Kỹ thuật ánh sáng, hậu kỳ, súng, hiệu ứng và âm thanh port từ <b>Saltline</b> của Felix Rieseberg.
-      Bộ dựng nhân vật port từ <b>Lanternfall</b> của loktar00. three.js r170 (MIT). Bản <span id="buildid">f8b76695248a</span>.
+      Bộ dựng nhân vật port từ <b>Lanternfall</b> của loktar00. three.js r170 (MIT). Bản <span id="buildid">808ab56f5b36</span>.
       <a href="bevy/" id="oldlink">Bản Bevy cũ</a></div>
   </div>
 </div>
@@ -99,7 +95,7 @@ window.__build = 'f8b76695248a';
 // Phiên 8: nạp main.js sau khi service worker (sw.js: thử lại khi Pages trả 5xx / mất mạng) đã nắm trang, để cả lần tải
 // đầu các module cũng được thử lại. Không có service worker (hay ?nosw) thì nạp thẳng; chờ tối đa 2,5 s.
 (function () {
-  var src="b/f8b76695248a/js/main.js?v=f8b76695248a";
+  var src="b/808ab56f5b36/js/main.js?v=808ab56f5b36";
   function go() { if (window.__mainInjected) return; window.__mainInjected = 1; var s = document.createElement('script'); s.type = 'module'; s.src = src; document.body.appendChild(s); }
   var q = new URLSearchParams(location.search);
   if (!('serviceWorker' in navigator) || q.has('nosw')) return go();

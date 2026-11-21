@@ -1,0 +1,40 @@
+/* Plug-in "notes": the original's notification column on the right of the HUD (PARITY M06 / M07 / M08).
+   Measured on clip 18 4:00 (1280x720): column 315 px wide under the OPEN / CLOSED plate, cards 4 px apart; a green
+   "You are currently promoting X" card (45 px), a blue contract card (75 px) with the item square on the right and a
+   thin progress bar, green notice cards with a check square. Sizes are in HUD em (1.48vh) so 1280x720 and 1920x1080 match. */
+#hud .tn-col { display: flex; flex-direction: column; align-items: stretch; gap: 0.32em; width: 29.5em; margin-top: 0.6em; }
+#hud .tn-card { position: relative; display: flex; align-items: center; gap: 0.75em; min-height: 4.2em; padding: 0.45em 0.7em 0.45em 0.55em;
+  border-radius: 0.18em; color: #fff; font-weight: 700; font-size: 1.08em; line-height: 1.25; text-shadow: 0 1px 1px rgba(0,0,0,.45);
+  box-shadow: 0 1px 3px rgba(0,0,0,.35); transform-origin: 100% 50%; animation: tn-in 260ms cubic-bezier(0.2, 0, 0, 1) both; }
+#hud .tn-card.out { animation: tn-out 320ms ease-in both; }
+@keyframes tn-in { from { opacity: 0; transform: translateX(1.2em); } to { opacity: 1; transform: none; } }
+@keyframes tn-out { to { opacity: 0; transform: translateX(1.2em); } }
+#hud .tn-card .tn-ic { flex: none; width: 2.3em; height: 2.3em; border-radius: 0.14em; display: grid; place-items: center; }
+#hud .tn-card .tn-ic svg { width: 1.6em; height: 1.6em; }
+#hud .tn-card .tn-t { flex: 1; min-width: 0; }
+#hud .tn-card .tn-t em { font-style: normal; color: #ffe94a; }
+#hud .tn-card .tn-days { flex: none; display: flex; align-items: center; gap: 0.3em; font-size: 1.08em; }
+#hud .tn-card .tn-days svg { width: 1.05em; height: 1.05em; }
+/* [FTUE A6] orange "Raid Rumour" card (UpcomingRaidDetailsView): header, "N Days" + clock, "N Waves", direction */
+#hud .tn-rumour { background: linear-gradient(180deg, rgba(226, 122, 30, 0.94), rgba(196, 92, 18, 0.94)); box-shadow: inset 0 0 0 2px #ffae4a, 0 1px 3px rgba(0,0,0,.35); }
+#hud .tn-rumour .tn-t { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35em 0.9em; }
+#hud .tn-rumour .tn-h { flex-basis: 100%; font-size: 1.1em; letter-spacing: 0.02em; }
+#hud .tn-rumour .tn-rr { display: inline-flex; align-items: center; gap: 0.3em; font-size: 0.95em; }
+#hud .tn-rumour .tn-rr svg { width: 1em; height: 1em; }
+/* green: notices and the promotion */
+#hud .tn-ok, #hud .tn-promo { background: linear-gradient(180deg, rgba(56, 170, 84, 0.92), rgba(36, 138, 64, 0.92)); }
+#hud .tn-ok .tn-ic { background: #2fd14a; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); }
+#hud .tn-promo .tn-ic { background: #1f9a3e; box-shadow: inset 0 0 0 2px rgba(255,255,255,.18); }
+#hud .tn-promo .tn-t { font-size: 0.94em; }
+/* blue: the Drop Dead Docks contract being tracked */
+#hud .tn-con { min-height: 6.6em; padding: 0.35em 0.4em 0.75em 0.7em; background: linear-gradient(180deg, rgba(44, 92, 214, 0.93), rgba(30, 66, 178, 0.93));
+  box-shadow: inset 0 0 0 2px #4f8df5, 0 1px 3px rgba(0,0,0,.35); }
+#hud .tn-con .tn-t { display: grid; grid-template-columns: 1fr auto; row-gap: 0.55em; align-items: center; font-size: 1.12em; }
+#hud .tn-con .tn-t .tn-sell { display: flex; align-items: center; gap: 0.45em; }
+#hud .tn-con .tn-t .tn-sell i { width: 1.05em; height: 0.3em; background: #e0342c; border-radius: 0.1em; }
+#hud .tn-con .tn-t .tn-days { font-size: 0.8em; justify-self: end; }
+#hud .tn-con .tn-t .tn-prog { grid-column: 2; justify-self: end; font-size: 0.9em; }
+#hud .tn-con .tn-item { flex: none; width: 4.9em; height: 4.9em; border-radius: 0.14em; background: #2f6fd8; box-shadow: inset 0 0 0 2px #6aa6ff; display: grid; place-items: center; }
+#hud .tn-con .tn-item img { width: 4.2em; height: 4.2em; object-fit: contain; }
+#hud .tn-con .tn-bar { position: absolute; left: 0.7em; right: 5.9em; bottom: 0.5em; height: 0.3em; background: rgba(10, 20, 60, 0.55); border-radius: 0.1em; overflow: hidden; }
+#hud .tn-con .tn-bar b { display: block; height: 100%; background: #6fd0ff; transform-origin: 0 50%; }
